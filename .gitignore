@@ -1,0 +1,14 @@
+# Environment variables
+.env
+
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+
+# Trained Model (if large or specific to your machine)
+*.pkl
+
+# IDE files (optional)
+.vscode/
+*.idea/

@@ -1,0 +1,184 @@
+/* Basic Reset */
+* {
+    box-sizing: border-box;
+}
+body {
+    font-family: -apple-system, BlinkMacFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+}
+/* Main Layout using CSS Grid */
+.main-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: 100%;
+}
+.sidebar {
+    background-color: #ffffff;
+    padding: 20px;
+    overflow-y: auto;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+
+/* --- CHANGE #1: ADD 'position: relative' HERE --- */
+.map-container {
+    position: relative; /* This is crucial for positioning the top panel */
+    height: 100%;
+    width: 100%;
+}
+#map {
+    height: 100%;
+    width: 100%;
+}
+
+/* --- Sidebar Content Styling --- */
+.title {
+    color: #0056b3;
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+.form-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+input[type="text"] {
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}
+#start-nav-btn {
+    padding: 12px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+#start-nav-btn:hover {
+    background-color: #218838;
+}
+#in-trip-controls {
+    margin-top: 20px;
+}
+.stop-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.stop-btn {
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+.stop-btn:hover {
+    background-color: #0056b3;
+}
+.hidden {
+    display: none;
+}
+#results-container h2 {
+    margin-top: 20px;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 5px;
+    font-size: 1.2rem;
+}
+#stops-ul,
+#directions-ul {
+    list-style-type: none;
+    padding: 0;
+}
+#stops-ul li,
+#directions-ul li {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+#stops-ul li:hover,
+#directions-ul li:hover {
+    background-color: #e9ecef;
+}
+#stops-ul li strong {
+    color: #0056b3;
+}
+.input-with-button {
+    position: relative;
+    display: flex;
+}
+.input-with-button input {
+    width: 100%;
+    padding-right: 40px;
+}
+.location-btn {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 5px;
+}
+
+/* --- CHANGE #2: REPLACE your old #current-turn-panel style with this new one --- */
+#current-turn-panel {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 500px;
+    background-color: rgba(0, 86, 179, 0.9);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 1000;
+    pointer-events: none;
+}
+#current-turn-panel .turn-instruction {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+#current-turn-panel .next-turn-info {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin-top: 5px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.custom-search-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+#custom-query-input {
+    width: 100%;
+    flex-grow: 1;
+}
+#custom-query-btn {
+    padding: 10px 15px;
+    background-color: #5a6268;
+    flex-shrink: 0;
+}
+#custom-query-btn:hover {
+    background-color: #494f54;
+}
