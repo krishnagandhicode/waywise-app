@@ -1,6 +1,5 @@
 # WayWise AI - Real-Time Intelligent Navigation Assistant
-
-<img width="1918" height="972" alt="WayWise" src="https://github.com/user-attachments/assets/50b3ebcb-3d8e-47f3-a83c-e6a45d1d5898" />
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/cbab8ea5-ac10-4b8e-a6e7-ed18387f86ec" />
 
 ## Introduction
 
@@ -83,6 +82,9 @@ This project was born out of the common frustration of finding convenient stops 
 
 ## Future Scope
 
-* Integrate a conversational AI chatbot (using Gemini API) for hands-free interaction and smarter suggestions based on context (weather, time of day).
-* Implement proactive notifications (e.g., warnings about upcoming long stretches without petrol stations).
-* Add real-time data integration (e.g., petrol prices).
+The Future Roadmap: Convoy & AI (See Diagram) Building this foundation has opened the door for two major features I plan to develop next:
+1. Live Convoy Mode: Solving the logistics of group road trips. Instead of constant status calls, you will see your friends' vehicles moving in real-time on a shared trip map via WebSockets.
+2. Conversational AI Assistant: Driving requires focus. I am designing a voice-enabled interface where you can command, "Find a highly-rated restaurant in the next 30km," and the AI handles the complex querying without manual input.
+
+<img width="1280" height="698" alt="image" src="https://github.com/user-attachments/assets/99bb7e55-0410-4143-a5cf-b35051aa6b64" />
+
