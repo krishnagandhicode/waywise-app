@@ -2,17 +2,21 @@
 * {
     box-sizing: border-box;
 }
+html,
+body {
+    height: 100%;
+}
 body {
     font-family: -apple-system, BlinkMacFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
-    height: 100vh;
+    min-height: 100%;
     overflow: hidden;
 }
 /* Main Layout using CSS Grid */
 .main-grid {
     display: grid;
     grid-template-columns: 380px 1fr;
-    height: 100%;
+    height: 100vh;
 }
 .sidebar {
     background-color: #ffffff;
@@ -22,14 +26,13 @@ body {
     z-index: 1000;
 }
 
-/* --- CHANGE #1: ADD 'position: relative' HERE --- */
 .map-container {
-    position: relative; /* This is crucial for positioning the top panel */
-    height: 100%;
+    position: relative;
+    height: 100vh;
     width: 100%;
 }
 #map {
-    height: 100%;
+    height: 100vh;
     width: 100%;
 }
 
@@ -39,6 +42,24 @@ body {
     text-align: center;
     margin-top: 0;
     margin-bottom: 1rem;
+}
+.backend-status {
+    font-size: 0.9rem;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    border: 1px solid #d1d5db;
+    background: #f3f4f6;
+}
+.status-good {
+    background: #ecfdf5;
+    border-color: #34d399;
+    color: #065f46;
+}
+.status-bad {
+    background: #fef2f2;
+    border-color: #f87171;
+    color: #991b1b;
 }
 .form-container {
     display: flex;
@@ -135,7 +156,6 @@ input[type="text"] {
     padding: 5px;
 }
 
-/* --- CHANGE #2: REPLACE your old #current-turn-panel style with this new one --- */
 #current-turn-panel {
     position: absolute;
     top: 20px;
@@ -181,4 +201,98 @@ input[type="text"] {
 }
 #custom-query-btn:hover {
     background-color: #494f54;
+}
+
+.convoy-controls {
+    margin-top: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fafafa;
+}
+.convoy-controls h3 {
+    margin: 0 0 10px;
+}
+.convoy-controls input[type="text"] {
+    width: 100%;
+    margin-bottom: 10px;
+}
+.convoy-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+}
+#convoy-create-btn,
+#convoy-join-btn,
+#convoy-leave-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: #ffffff;
+    cursor: pointer;
+}
+#convoy-create-btn,
+#convoy-join-btn {
+    background: #1d4ed8;
+}
+#convoy-leave-btn {
+    margin-top: 8px;
+    background: #b91c1c;
+}
+.convoy-session {
+    margin-top: 10px;
+}
+.convoy-room-label {
+    margin: 0;
+    font-weight: 600;
+}
+#convoy-members-ul {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0;
+}
+#convoy-members-ul li {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.leaflet-tooltip.convoy-label {
+    background: #111827;
+    color: #ffffff;
+    border: 0;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    font-weight: 600;
+    padding: 4px 8px;
+}
+
+.leaflet-tooltip.convoy-label:before {
+    border-top-color: #111827;
+}
+
+@media (max-width: 900px) {
+    body {
+        overflow: auto;
+    }
+    .main-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 55vh;
+        height: auto;
+        min-height: 100vh;
+    }
+    .map-container {
+        height: 55vh;
+        min-height: 55vh;
+    }
+    #map {
+        height: 55vh;
+    }
+    #current-turn-panel {
+        width: calc(100% - 20px);
+        top: 10px;
+    }
 }

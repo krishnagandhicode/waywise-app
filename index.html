@@ -12,6 +12,7 @@
     <div class="main-grid">
         <div class="sidebar">
             <h1 class="title">WayWise AI</h1>
+            <div id="backend-status" class="backend-status">Checking backend status...</div>
 
             <div class="form-container">
                 <div class="input-with-button">
@@ -39,8 +40,23 @@
                 </div>
             </div>
 
+            <div id="convoy-controls" class="convoy-controls">
+                <h3>Convoy</h3>
+                <input type="text" id="convoy-name" placeholder="Your name">
+                <div class="convoy-row">
+                    <button id="convoy-create-btn" type="button">Create</button>
+                    <input type="text" id="convoy-room-id" placeholder="Room code">
+                    <button id="convoy-join-btn" type="button">Join</button>
+                </div>
+                <div id="convoy-session" class="convoy-session hidden">
+                    <p id="convoy-active-room" class="convoy-room-label"></p>
+                    <button id="convoy-leave-btn" type="button">Leave Convoy</button>
+                    <ul id="convoy-members-ul"></ul>
+                </div>
+            </div>
+
             <div id="results-container">
-                <div id="directions-panel" class="hidden"> 
+                <div id="directions-panel" class="hidden">
                     <h2>Directions</h2>
                     <ul id="directions-ul"></ul>
                 </div>

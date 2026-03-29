@@ -16,6 +16,8 @@ This project was born out of the common frustration of finding convenient stops 
     * Ranks suggested stops based on the shortest real-time detour duration calculated via the Google Distance Matrix API, using the user's live location as the origin.
 * **"Use My Location":** Allows users to instantly populate origin/destination fields with their current address using reverse geocoding (OpenStreetMap Nominatim).
 * **Interactive UI:** Responsive two-column layout built with HTML, CSS (Grid), and JavaScript, featuring map markers, route display, and dynamic results lists.
+* **Backend Health Indicator:** Frontend shows whether backend is reachable and which provider mode is active.
+* **Convoy Mode (MVP):** Create or join a room and share live locations among members during a trip.
 * **(Future Scope):** Integrated conversational AI assistant (using Gemini AI API) for contextual, on-the-go recommendations. ## Demo
 
 
@@ -26,6 +28,7 @@ This project was born out of the common frustration of finding convenient stops 
 * **Frontend:** JavaScript, HTML5, CSS3 (Grid Layout), Leaflet.js
 * **APIs:**
     * Google Maps Platform (Directions, Places, Distance Matrix)
+    * Free map stack for testing (OSRM + OpenStreetMap Nominatim + Overpass)
     * Browser Geolocation API (getCurrentPosition, watchPosition)
     * OpenStreetMap Nominatim (Reverse Geocoding)
     * [Optional: Gemini AI API - if implementing chatbot]
@@ -52,23 +55,20 @@ This project was born out of the common frustration of finding convenient stops 
     # Optional, if using the ML part:
     # pip install pandas scikit-learn surprise
     ```
-4.  **Set up API Key:**
+4.  **Set up configuration:**
     * Create a `.env` file in the project root.
-    * Add your Google Maps API key: `Maps_API_KEY="YOUR_API_KEY_HERE"`
-    * Ensure you have enabled the Directions, Places, and Distance Matrix APIs in your Google Cloud Console.
-5.  **Run the Backend Server:**
+    * For Google provider, add your API key: `GOOGLE_MAPS_API_KEY="YOUR_API_KEY_HERE"`
+    * To run with free APIs for real-world testing, set: `WAYWISE_MAP_PROVIDER="free"`
+    * Optional testing flags:
+        * `WAYWISE_MOCK_MODE="false"` (use live free APIs)
+        * `DISTANCE_MATRIX_MAX_DESTINATIONS="10"` (safer cap for public endpoints)
+    * Ensure you have enabled the Directions, Places, and Distance Matrix APIs in your Google Cloud Console only if you are using Google provider.
+5.  **Run the App (single server):**
     ```bash
-    flask --app app run
+    python app.py
     ```
     *(Keep this terminal running)*
-6.  **Run the Frontend Server:**
-    * Open a **new terminal**.
-    * Activate the virtual environment again (`venv\Scripts\activate` or `source venv/bin/activate`).
-    * Start the simple Python HTTP server:
-        ```bash
-        python -m http.server 8000
-        ```
-7.  **Access the application:** Open your web browser and go to `http://localhost:8000`.
+6.  **Access the application:** Open your web browser and go to `http://127.0.0.1:5000`.
 
 ## Usage
 
@@ -78,6 +78,56 @@ This project was born out of the common frustration of finding convenient stops 
 4.  The map will display the route, your live location (blue dot), and the current turn instruction at the top.
 5.  Use the buttons ("Petrol", "Restaurant", etc.) or the search bar under "Find on my way..." to find relevant stops.
 6.  Results will be displayed as pins on the map and as a ranked list in the sidebar.
+
+### Convoy Quick Start
+
+1. Enter your name in the Convoy section.
+2. Click **Create** to create a room, or enter a room code and click **Join**.
+3. Start navigation and allow location permission.
+4. Members in the same room can see each other's live markers on the map.
+5. Click **Leave Convoy** when done.
+
+## Provider Modes
+
+WayWise supports two map providers through environment variables:
+
+* `WAYWISE_MAP_PROVIDER="google"`:
+    * Routing: Google Directions
+    * Stops: Google Places
+    * Ranking: Google Distance Matrix
+
+* `WAYWISE_MAP_PROVIDER="free"` (default):
+    * Routing: OSRM public API
+    * Geocoding: OpenStreetMap Nominatim
+    * Stops: Overpass API
+    * Ranking: OSRM Table API
+
+Recommended for efficient testing:
+
+```env
+WAYWISE_MOCK_MODE=false
+WAYWISE_MAP_PROVIDER=free
+DISTANCE_MATRIX_MAX_DESTINATIONS=10
+FREE_MAX_SEARCH_POINTS=8
+```
+
+Note: Public free endpoints are rate-limited and shared. Use moderate request frequency and keep caps low during testing.
+If one Overpass endpoint is rate-limited, WayWise automatically tries fallback endpoints.
+
+## Troubleshooting
+
+* If startup fails because port 5000 is busy, close old Python processes or run with a different port:
+
+```bash
+set PORT=5001
+python app.py
+```
+
+* Health check endpoint:
+
+```bash
+http://127.0.0.1:5000/health
+```
 
 ## Future Scope
 
