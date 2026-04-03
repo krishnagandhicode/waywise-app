@@ -39,8 +39,8 @@ This project was born out of the common frustration of finding convenient stops 
 
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/YourUsername/WayWise-AI.git](https://github.com/krishnaGandhi11/WayWise---Real-Time-Intelligent-Navigation-Assistant-)
-    cd WayWise-AI
+    git clone https://github.com/krishnagandhicode/waywise-app.git
+    cd waywise-app
     ```
 2.  **Create and activate a virtual environment:**
     ```bash
@@ -52,9 +52,7 @@ This project was born out of the common frustration of finding convenient stops 
     ```
 3.  **Install dependencies:**
     ```bash
-    pip install Flask Flask-CORS requests python-dotenv polyline haversine
-    # Optional, if using the ML part:
-    # pip install pandas scikit-learn surprise
+    pip install -r requirements.txt
     ```
 4.  **Set up configuration:**
     * Create a `.env` file in the project root.
@@ -79,6 +77,41 @@ This project was born out of the common frustration of finding convenient stops 
 4.  The map will display the route, your live location (blue dot), and the current turn instruction at the top.
 5.  Use the buttons ("Petrol", "Restaurant", etc.) or the search bar under "Find on my way..." to find relevant stops.
 6.  Results will be displayed as pins on the map and as a ranked list in the sidebar.
+
+## Project Architecture
+
+```text
+waywise-app/
+|- app.py                      # Root launcher (keeps run command simple)
+|- requirements.txt
+|- backend/
+|  |- __init__.py
+|  |- app.py                   # Flask API + routing + provider logic
+|- frontend/
+|  |- templates/
+|  |  |- index.html            # Main UI shell
+|  |- static/
+|     |- css/
+|     |  |- style.css          # App styling
+|     |- js/
+|        |- script.js          # Frontend app entry (module)
+|        |- modules/
+|           |- api.js          # URL building and JSON fetch helpers
+|           |- map.js          # Map and turn-panel helpers
+|           |- convoy.js       # Convoy marker/member rendering
+|- Some-Screnshots/
+```
+
+Flask serves frontend files from `frontend/templates` and `frontend/static`.
+
+## Tests
+
+Install dev dependencies and run tests:
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ### Convoy Quick Start
 
@@ -115,6 +148,22 @@ FREE_MAX_SEARCH_POINTS=8
 Note: Public free endpoints are rate-limited and shared. Use moderate request frequency and keep caps low during testing.
 If one Overpass endpoint is rate-limited, WayWise automatically tries fallback endpoints.
 
+## Google Baseline Reference Page
+
+To explore a direct Google Maps JavaScript baseline (map init + route render + places search), open:
+
+```text
+http://127.0.0.1:5000/google-baseline
+```
+
+Set a browser-restricted API key in `.env`:
+
+```env
+GOOGLE_MAPS_JS_API_KEY="YOUR_BROWSER_KEY"
+```
+
+If `GOOGLE_MAPS_JS_API_KEY` is not set, the page falls back to `GOOGLE_MAPS_API_KEY`.
+
 ## Troubleshooting
 
 * If startup fails because port 5000 is busy, close old Python processes or run with a different port:
@@ -132,9 +181,56 @@ http://127.0.0.1:5000/health
 
 ## Future Scope
 
-The Future Roadmap: Convoy & AI (See Diagram) Building this foundation has opened the door for two major features I plan to develop next:
-1. Live Convoy Mode: Solving the logistics of group road trips. Instead of constant status calls, you will see your friends' vehicles moving in real-time on a shared trip map via WebSockets.
-2. Conversational AI Assistant: Driving requires focus. I am designing a voice-enabled interface where you can command, "Find a highly-rated restaurant in the next 30km," and the AI handles the complex querying without manual input.
+* Integrate a conversational AI chatbot (using Gemini API) for hands-free interaction and smarter suggestions based on context (weather, time of day).
+* Implement proactive notifications (e.g., warnings about upcoming long stretches without petrol stations).
+* Add real-time data integration (e.g., petrol prices).
+
+### Future Roadmap: Convoy and AI
+
+Building this foundation opens the door for two major feature tracks:
+
+1. Live Convoy Mode:
+    * Real-time group trip visibility via shared map sessions and low-latency location updates.
+2. Conversational AI Assistant:
+    * Voice-first trip actions such as finding highly-rated stops along route without manual searching.
 
 <img width="1280" height="698" alt="image" src="https://github.com/user-attachments/assets/99bb7e55-0410-4143-a5cf-b35051aa6b64" />
 
+## Legal and Ownership
+
+Copyright (c) 2026 Krishna Gandhi. All rights reserved.
+
+WayWise is a trademark of Krishna Gandhi.
+
+This repository includes a custom `All Rights Reserved` license in [LICENSE](LICENSE). No permission is granted for reuse, redistribution, or derivative work without explicit written approval.
+
+### Repository Privacy Recommendation
+
+If you want to keep implementation details private while building, keep the GitHub repository private and deploy from the private repository.
+
+## Deployment Recommendation
+
+For this codebase, the simplest and most reliable setup is a single Render web service for both backend and frontend.
+
+Why this is recommended first:
+
+* Flask already serves the frontend templates and static files.
+* No cross-origin issues between Netlify frontend and Render backend.
+* No extra proxy rules or split environment variables needed.
+
+### Render Deployment (Recommended)
+
+1. Push repository to GitHub.
+2. Create a new Web Service on Render from the repository.
+3. Use build command: `pip install -r requirements.txt`
+4. Use start command: `gunicorn app:app`
+5. Set environment variables on Render:
+    * `WAYWISE_MAP_PROVIDER=free`
+    * `WAYWISE_MOCK_MODE=false`
+    * `DISTANCE_MATRIX_MAX_DESTINATIONS=10`
+    * `FREE_MAX_SEARCH_POINTS=8`
+6. Deploy and open the Render URL.
+
+### When to Use Netlify + Render Split
+
+Use split deployment only if you later move to a separate frontend framework build (for example React/Vite) and want independent frontend hosting/CDN optimization.

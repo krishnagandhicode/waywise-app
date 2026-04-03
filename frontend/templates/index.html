@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WayWise</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand-wrap">
+            <span class="brand-mark">W</span>
+            <div>
+                <h1 class="brand-title">WayWise</h1>
+                <p class="brand-subtitle">Smart Route Assistant</p>
+            </div>
+        </div>
+        <div id="backend-status" class="backend-status">Checking backend status...</div>
+    </header>
+
+    <main class="app-shell">
+        <aside class="control-panel">
+            <section class="card route-card">
+                <h2>Trip Setup</h2>
+                <div class="field-stack">
+                    <div class="input-with-button">
+                        <input type="text" id="origin" placeholder="Enter start location">
+                        <button id="current-location-origin" class="location-btn" title="Fill with your current GPS location">Use GPS</button>
+                    </div>
+                    <div class="input-with-button">
+                        <input type="text" id="destination" placeholder="Enter destination">
+                        <button id="current-location-dest" class="location-btn" title="Fill with your current GPS location">Use GPS</button>
+                    </div>
+                </div>
+                <button id="start-nav-btn">Start Navigation</button>
+            </section>
+
+            <section id="in-trip-controls" class="card hidden">
+                <h3>Search Along Route</h3>
+                <div class="stop-buttons">
+                    <button class="stop-btn" data-query="petrol pump">Fuel</button>
+                    <button class="stop-btn" data-query="restaurant">Food</button>
+                    <button class="stop-btn" data-query="dhaba">Dhaba</button>
+                    <button class="stop-btn" data-query="atm">ATM</button>
+                </div>
+                <div class="custom-search-container">
+                    <input type="text" id="custom-query-input" placeholder="Search custom stops like pharmacy, cafe...">
+                    <button id="custom-query-btn">Search</button>
+                </div>
+            </section>
+
+            <section id="convoy-controls" class="card convoy-controls">
+                <h3>Convoy (Live)</h3>
+                <input type="text" id="convoy-name" placeholder="Your name">
+                <div class="convoy-row">
+                    <button id="convoy-create-btn" type="button">Create</button>
+                    <input type="text" id="convoy-room-id" placeholder="Room code">
+                    <button id="convoy-join-btn" type="button">Join</button>
+                </div>
+                <div id="convoy-session" class="convoy-session hidden">
+                    <p id="convoy-active-room" class="convoy-room-label"></p>
+                    <button id="convoy-leave-btn" type="button">Leave Convoy</button>
+                    <ul id="convoy-members-ul"></ul>
+                </div>
+            </section>
+
+            <section id="stops-panel" class="card stops-panel">
+                <h3>Suggested Stops</h3>
+                <ul id="stops-ul"></ul>
+            </section>
+
+            <section id="directions-panel" class="hidden">
+                <ul id="directions-ul"></ul>
+            </section>
+
+            <p class="legal-note">Copyright 2026 Krishna Gandhi. WayWise is a trademark of Krishna Gandhi. All rights reserved.</p>
+        </aside>
+
+        <section class="map-container">
+            <div id="map"></div>
+            <div id="current-turn-panel" class="hidden"></div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script type="module" src="/static/js/script.js"></script>
+</body>
+</html>

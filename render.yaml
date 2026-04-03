@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: waywise-app
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    autoDeploy: true
+    envVars:
+      - key: WAYWISE_MAP_PROVIDER
+        value: free
+      - key: WAYWISE_MOCK_MODE
+        value: false
+      - key: DISTANCE_MATRIX_MAX_DESTINATIONS
+        value: 10
+      - key: FREE_MAX_SEARCH_POINTS
+        value: 8

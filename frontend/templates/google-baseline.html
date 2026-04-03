@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WayWise Google Baseline</title>
+    <style>
+        :root {
+            --bg: #f4f7ff;
+            --panel: #ffffff;
+            --line: #dbe5ff;
+            --text: #0f172a;
+            --muted: #4b5563;
+            --primary: #0b5be0;
+            --ok: #0b7a2f;
+            --error: #b91c1c;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Segoe UI, Arial, sans-serif;
+            color: var(--text);
+            background: var(--bg);
+        }
+
+        .shell {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            min-height: 100vh;
+        }
+
+        .panel {
+            background: var(--panel);
+            border-right: 1px solid var(--line);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        input {
+            width: 100%;
+            height: 40px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0 10px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        button {
+            flex: 1;
+            height: 40px;
+            border: 0;
+            border-radius: 8px;
+            color: #ffffff;
+            background: var(--primary);
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .gb-status {
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            background: #eef2ff;
+            color: #1e3a8a;
+        }
+
+        .gb-status-success {
+            background: #ecfdf3;
+            color: var(--ok);
+        }
+
+        .gb-status-error {
+            background: #fef2f2;
+            color: var(--error);
+        }
+
+        #gb-summary {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        #gb-results {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 36vh;
+            overflow: auto;
+        }
+
+        #gb-results li {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 8px;
+            font-size: 0.85rem;
+            background: #f9fbff;
+        }
+
+        #gb-map {
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        @media (max-width: 900px) {
+            .shell {
+                grid-template-columns: 1fr;
+            }
+
+            #gb-map {
+                min-height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <aside class="panel">
+            <h1>Google Baseline</h1>
+            <p>Reference flow using Google Maps JavaScript API.</p>
+
+            <label for="gb-api-key">Google API Key</label>
+            <input id="gb-api-key" type="text" placeholder="Paste browser-restricted key" value="{{ google_maps_js_api_key or '' }}">
+
+            <label for="gb-origin">Origin</label>
+            <input id="gb-origin" type="text" placeholder="Delhi" value="Chandigarh">
+
+            <label for="gb-destination">Destination</label>
+            <input id="gb-destination" type="text" placeholder="Shimla" value="Shimla">
+
+            <div class="actions">
+                <button id="gb-route-btn" type="button">Render Route</button>
+                <button id="gb-search-btn" type="button">Search Places</button>
+            </div>
+
+            <label for="gb-query">Place Query</label>
+            <input id="gb-query" type="text" placeholder="petrol pump, food, atm" value="petrol pump">
+
+            <div id="gb-status" class="gb-status"></div>
+            <div id="gb-summary"></div>
+
+            <ul id="gb-results"></ul>
+        </aside>
+
+        <section id="gb-map"></section>
+    </div>
+
+    <script type="module" src="/static/js/google-baseline-app.js"></script>
+</body>
+</html>
