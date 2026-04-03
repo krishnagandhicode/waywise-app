@@ -1,0 +1,7 @@
+Flask
+Flask-Cors
+gunicorn
+requests
+python-dotenv
+polyline
+haversine

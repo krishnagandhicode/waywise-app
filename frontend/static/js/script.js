@@ -1,15 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const API_BASE = window.location.origin;
+import { buildApiUrl, fetchJson } from './modules/api.js';
+import { createMap, getCurrentTurnInfo, renderCurrentTurn } from './modules/map.js';
+import { renderConvoyMembersUI } from './modules/convoy.js';
 
-    function buildApiUrl(path, params = {}) {
-        const url = new URL(path, API_BASE);
-        Object.entries(params).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-                url.searchParams.set(key, value);
-            }
-        });
-        return url.toString();
-    }
+document.addEventListener('DOMContentLoaded', () => {
 
     function setStopSearchLoading(isLoading) {
         const stopBtns = document.querySelectorAll('.stop-btn');
@@ -19,22 +12,38 @@ document.addEventListener('DOMContentLoaded', () => {
         customQueryBtn.disabled = isLoading;
     }
 
+    function renderStopSearchRetry(message, query) {
+        stopsUl.innerHTML = '';
+        const item = document.createElement('li');
+        const text = document.createElement('div');
+        text.textContent = message;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'stop-btn stop-retry-btn';
+        button.dataset.query = query;
+        button.textContent = 'Retry';
+        item.appendChild(text);
+        item.appendChild(button);
+        stopsUl.appendChild(item);
+    }
+
     // --- MAP AND ELEMENT REFERENCES ---
-    const map = L.map('map').setView([28.6139, 77.2090], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+    const { map, markersLayer, convoyLayer } = createMap({
+        mapId: 'map',
+        initialCenter: [28.6139, 77.2090],
+        zoom: 7,
+    });
 
     let routeCoordinates = [];
     let directionSteps = [];
     let routeLayer = null;
-    let markersLayer = new L.LayerGroup().addTo(map);
-    let convoyLayer = new L.LayerGroup().addTo(map);
     let positionMarker = null;
     let watchId = null;
     let lastKnownPosition = null;
     let convoyRoomId = null;
     let convoyMemberId = null;
+    let convoySharedDestination = null;
+    let convoyAutoRouteInFlight = false;
     let convoyPollTimer = null;
     const convoyMarkers = new Map();
 
@@ -63,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     currentLocationOriginBtn.addEventListener('click', () => setInputToCurrentLocation(originInput));
     currentLocationDestBtn.addEventListener('click', () => setInputToCurrentLocation(destinationInput));
-    startNavBtn.addEventListener('click', startNavigation);
+    startNavBtn.addEventListener('click', () => startNavigation());
 
     stopButtonsContainer.addEventListener('click', (event) => {
         const clickedButton = event.target.closest('.stop-btn');
@@ -87,6 +96,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    stopsUl.addEventListener('click', (event) => {
+        const retryBtn = event.target.closest('.stop-retry-btn');
+        if (retryBtn) {
+            findAndDisplayStops(retryBtn.dataset.query || '');
+        }
+    });
+
     convoyCreateBtn.addEventListener('click', createConvoy);
     convoyJoinBtn.addEventListener('click', joinConvoy);
     convoyLeaveBtn.addEventListener('click', leaveConvoy);
@@ -107,11 +123,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function updateBackendStatus() {
         try {
-            const response = await fetch(buildApiUrl('/health'));
+            const { response, data } = await fetchJson(buildApiUrl('/health'));
             if (!response.ok) {
                 throw new Error('Health check failed');
             }
-            const data = await response.json();
             backendStatus.classList.remove('status-bad');
             backendStatus.classList.add('status-good');
             backendStatus.textContent = `Backend: online | Provider: ${data.provider} | Mock: ${data.mock_mode ? 'yes' : 'no'}`;
@@ -122,10 +137,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function startNavigation() {
+    async function startNavigation(options = {}) {
+        const { suppressConvoySync = false } = options;
         const origin = originInput.value;
         const destination = destinationInput.value;
         if (!origin || !destination) return alert('Please fill out Origin and Destination.');
+
+        if (convoyRoomId && convoyMemberId && !suppressConvoySync) {
+            syncConvoyDestination(destination).catch((error) => {
+                console.error('Failed to sync convoy destination:', error);
+            });
+        }
 
         startNavBtn.textContent = 'Calculating Route...';
         startNavBtn.disabled = true;
@@ -169,11 +191,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 live_lat: latitude ?? undefined,
                 live_lng: longitude ?? undefined,
             });
-            const response = await fetch(apiUrl);
-            const data = await response.json();
+            const { response, data } = await fetchJson(apiUrl);
             if (!response.ok) throw new Error(data.error || 'Stop search failed.');
 
             stopsUl.innerHTML = '';
+            if (data.provider_notice) {
+                const noticeItem = document.createElement('li');
+                noticeItem.textContent = data.provider_notice;
+                stopsUl.appendChild(noticeItem);
+            }
             if (data.stops && data.stops.length > 0) {
                 data.stops.forEach(stop => {
                     const marker = L.marker([stop.location.lat, stop.location.lng]).addTo(markersLayer);
@@ -183,11 +209,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     stopsUl.appendChild(li);
                 });
             } else {
-                stopsUl.innerHTML = `<li>No on-route results found for '${query}'.</li>`;
+                const emptyItem = document.createElement('li');
+                emptyItem.textContent = `No on-route results found for '${query}'.`;
+                stopsUl.appendChild(emptyItem);
             }
         } catch (error) {
             console.error("Error finding stops:", error);
-            stopsUl.innerHTML = `<li>${error.message || 'An error occurred while finding stops.'}</li>`;
+            renderStopSearchRetry(error.message || 'Stop search is temporarily unavailable.', query);
         } finally {
             setStopSearchLoading(false);
         }
@@ -224,47 +252,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCurrentTurn(currentLatLng) {
-        if (routeCoordinates.length === 0 || directionSteps.length === 0) return;
-
-        let closestPointIndex = 0;
-        let minDistance = Infinity;
-        routeCoordinates.forEach((point, index) => {
-            const distance = L.latLng(point).distanceTo(currentLatLng);
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestPointIndex = index;
-            }
-        });
-
-        const progress = closestPointIndex / routeCoordinates.length;
-        let currentStepIndex = Math.floor(progress * directionSteps.length);
-        currentStepIndex = Math.min(currentStepIndex, directionSteps.length - 1);
-
-        const currentInstruction = directionSteps[currentStepIndex];
-        const nextInstruction = directionSteps[currentStepIndex + 1] || "You are nearing your destination.";
-
-        currentTurnPanel.innerHTML = `
-            <p class="turn-instruction">${currentInstruction}</p>
-            <p class="next-turn-info">Next: ${nextInstruction}</p>
-        `;
+        const turnInfo = getCurrentTurnInfo(routeCoordinates, directionSteps, currentLatLng);
+        renderCurrentTurn(currentTurnPanel, turnInfo);
     }
 
-    function setInputToCurrentLocation(inputElement) {
-        if (!navigator.geolocation) return alert("Geolocation is not supported by your browser.");
+    function setInputToCurrentLocation(inputElement, options = {}) {
+        const { silent = false } = options;
+        if (!navigator.geolocation) {
+            if (!silent) alert("Geolocation is not supported by your browser.");
+            return Promise.reject(new Error('Geolocation is not supported by your browser.'));
+        }
+
         inputElement.placeholder = "Getting location...";
-        navigator.geolocation.getCurrentPosition(async (position) => {
-            const { latitude, longitude } = position.coords;
-            const reverseGeocodeUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
-            try {
-                const response = await fetch(reverseGeocodeUrl);
-                const data = await response.json();
-                inputElement.value = data.display_name || `${latitude}, ${longitude}`;
-            } catch (error) {
-                inputElement.value = `${latitude}, ${longitude}`;
-            }
-        }, () => {
-            alert("Unable to retrieve your location.");
-            inputElement.placeholder = "Enter Origin";
+
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                const reverseGeocodeUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+                try {
+                    const response = await fetch(reverseGeocodeUrl);
+                    const data = await response.json();
+                    inputElement.value = data.display_name || `${latitude}, ${longitude}`;
+                } catch (error) {
+                    inputElement.value = `${latitude}, ${longitude}`;
+                }
+                resolve(inputElement.value);
+            }, () => {
+                if (!silent) alert("Unable to retrieve your location.");
+                inputElement.placeholder = "Enter Origin";
+                reject(new Error('Unable to retrieve current location.'));
+            });
         });
     }
 
@@ -303,15 +320,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function createConvoy() {
+        const destination = destinationInput.value.trim();
         try {
-            const response = await fetch(buildApiUrl('/convoy/create'), {
+            const { response, data } = await fetchJson(buildApiUrl('/convoy/create'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: convoyNameInput.value.trim() || 'Leader' }),
+                body: JSON.stringify({
+                    name: convoyNameInput.value.trim() || 'Leader',
+                    destination: destination || undefined,
+                }),
             });
-            const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Unable to create convoy.');
-            activateConvoy(data.room_id, data.member_id, data.members || []);
+            activateConvoy(data.room_id, data.member_id, data.members || [], data.destination || null);
         } catch (error) {
             alert(error.message || 'Unable to create convoy.');
         }
@@ -324,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            const response = await fetch(buildApiUrl('/convoy/join'), {
+            const { response, data } = await fetchJson(buildApiUrl('/convoy/join'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -332,21 +352,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     name: convoyNameInput.value.trim() || 'Member',
                 }),
             });
-            const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Unable to join convoy.');
-            activateConvoy(data.room_id, data.member_id, data.members || []);
+            activateConvoy(data.room_id, data.member_id, data.members || [], data.destination || null);
         } catch (error) {
             alert(error.message || 'Unable to join convoy.');
         }
     }
 
-    function activateConvoy(roomId, memberId, members) {
+    function activateConvoy(roomId, memberId, members, destination) {
         convoyRoomId = roomId;
         convoyMemberId = memberId;
+        convoySharedDestination = destination || null;
         convoyRoomInput.value = roomId;
         convoySession.classList.remove('hidden');
         convoyActiveRoom.textContent = `Active Room: ${roomId}`;
         renderConvoyMembers(members);
+
+        if (convoySharedDestination) {
+            applySharedDestination(convoySharedDestination);
+        }
 
         // Push a first location update immediately if location access is available.
         ensureCurrentLocationForConvoy();
@@ -408,6 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
         convoyMembersUl.innerHTML = '';
         convoyLayer.clearLayers();
         convoyMarkers.clear();
+        convoySharedDestination = null;
+        convoyAutoRouteInFlight = false;
         if (convoyPollTimer) {
             clearInterval(convoyPollTimer);
             convoyPollTimer = null;
@@ -419,12 +445,64 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         try {
-            const response = await fetch(buildApiUrl('/convoy/state', { room_id: convoyRoomId }));
-            const data = await response.json();
+            const { response, data } = await fetchJson(buildApiUrl('/convoy/state', { room_id: convoyRoomId }));
             if (!response.ok) throw new Error(data.error || 'Unable to fetch convoy state.');
+            if (data.destination) {
+                applySharedDestination(data.destination);
+            }
             renderConvoyMembers(data.members || []);
         } catch (error) {
             console.error('Convoy refresh failed:', error);
+        }
+    }
+
+    async function syncConvoyDestination(destination) {
+        const cleanDestination = (destination || '').trim();
+        if (!convoyRoomId || !convoyMemberId || !cleanDestination) {
+            return;
+        }
+
+        convoySharedDestination = cleanDestination;
+        await fetchJson(buildApiUrl('/convoy/destination'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                room_id: convoyRoomId,
+                member_id: convoyMemberId,
+                destination: cleanDestination,
+            }),
+        });
+    }
+
+    function applySharedDestination(sharedDestination) {
+        const nextDestination = (sharedDestination || '').trim();
+        if (!nextDestination) {
+            return;
+        }
+
+        const currentDestination = (destinationInput.value || '').trim();
+        const isChanged = currentDestination.toLowerCase() !== nextDestination.toLowerCase();
+        destinationInput.value = nextDestination;
+        convoySharedDestination = nextDestination;
+
+        if (isChanged || routeCoordinates.length === 0) {
+            autoStartSharedRouteFromCurrentLocation(nextDestination).catch((error) => {
+                console.error('Unable to auto-start shared convoy route:', error);
+            });
+        }
+    }
+
+    async function autoStartSharedRouteFromCurrentLocation(sharedDestination) {
+        if (convoyAutoRouteInFlight) {
+            return;
+        }
+        convoyAutoRouteInFlight = true;
+        try {
+            destinationInput.value = sharedDestination;
+            await setInputToCurrentLocation(originInput, { silent: true });
+            await startNavigation({ suppressConvoySync: true });
+        } finally {
+            convoyAutoRouteInFlight = false;
         }
     }
 
@@ -445,76 +523,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function getMemberJitter(memberId) {
-        let hash = 0;
-        for (let i = 0; i < memberId.length; i += 1) {
-            hash = ((hash << 5) - hash) + memberId.charCodeAt(i);
-            hash |= 0;
-        }
-        const latOffset = ((hash % 7) - 3) * 0.00004;
-        const lngOffset = (((Math.floor(hash / 7)) % 7) - 3) * 0.00004;
-        return [latOffset, lngOffset];
-    }
-
     function renderConvoyMembers(members) {
-        convoyMembersUl.innerHTML = '';
-        const activeMemberIds = new Set();
-
-        members.forEach((member) => {
-            const isMe = member.member_id === convoyMemberId;
-            const name = member.name || 'Member';
-            const label = isMe ? `${name} (You)` : name;
-
-            const item = document.createElement('li');
-            if (member.lat == null || member.lng == null) {
-                item.textContent = `${label}: waiting for location...`;
-            } else {
-                const baseLat = Number(member.lat);
-                const baseLng = Number(member.lng);
-                const [latOffset, lngOffset] = getMemberJitter(member.member_id);
-                const markerLatLng = isMe ? [baseLat, baseLng] : [baseLat + latOffset, baseLng + lngOffset];
-
-                item.textContent = `${label}: ${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`;
-
-                let marker = convoyMarkers.get(member.member_id);
-                if (!marker) {
-                    marker = L.circleMarker(markerLatLng, {
-                        radius: isMe ? 10 : 8,
-                        color: isMe ? '#1d4ed8' : '#9a3412',
-                        fillColor: isMe ? '#2563eb' : '#f97316',
-                        fillOpacity: 0.95,
-                        weight: 2,
-                    }).addTo(convoyLayer);
-                    convoyMarkers.set(member.member_id, marker);
-                } else {
-                    marker.setLatLng(markerLatLng);
-                    marker.setStyle({
-                        radius: isMe ? 10 : 8,
-                        color: isMe ? '#1d4ed8' : '#9a3412',
-                        fillColor: isMe ? '#2563eb' : '#f97316',
-                        fillOpacity: 0.95,
-                        weight: 2,
-                    });
-                }
-
-                marker.bindPopup(`<b>${label}</b><br>${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`);
-                marker.bindTooltip(label, {
-                    permanent: true,
-                    direction: 'top',
-                    offset: [0, -12],
-                    className: 'convoy-label',
-                });
-                marker.bringToFront();
-                activeMemberIds.add(member.member_id);
-            }
-            convoyMembersUl.appendChild(item);
+        renderConvoyMembersUI({
+            members,
+            convoyMemberId,
+            convoyMembersUl,
+            convoyMarkers,
+            convoyLayer,
         });
-
-        for (const [memberId, marker] of convoyMarkers.entries()) {
-            if (!activeMemberIds.has(memberId)) {
-                convoyLayer.removeLayer(marker);
-                convoyMarkers.delete(memberId);
-            }
-        }
     }
 });
