@@ -1,4 +1,5 @@
 # WayWise AI - Real-Time Intelligent Navigation Assistant
+<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/cbab8ea5-ac10-4b8e-a6e7-ed18387f86ec" />
 
 ## Introduction
 
@@ -183,6 +184,17 @@ http://127.0.0.1:5000/health
 * Integrate a conversational AI chatbot (using Gemini API) for hands-free interaction and smarter suggestions based on context (weather, time of day).
 * Implement proactive notifications (e.g., warnings about upcoming long stretches without petrol stations).
 * Add real-time data integration (e.g., petrol prices).
+
+### Future Roadmap: Convoy and AI
+
+Building this foundation opens the door for two major feature tracks:
+
+1. Live Convoy Mode:
+    * Real-time group trip visibility via shared map sessions and low-latency location updates.
+2. Conversational AI Assistant:
+    * Voice-first trip actions such as finding highly-rated stops along route without manual searching.
+
+<img width="1280" height="698" alt="image" src="https://github.com/user-attachments/assets/99bb7e55-0410-4143-a5cf-b35051aa6b64" />
 
 ## Legal and Ownership
 
