@@ -314,6 +314,22 @@ button {
     font-size: 0.86rem;
 }
 
+.portfolio-highlights {
+    border-style: dashed;
+}
+
+.highlights-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #33466e;
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.highlights-list li {
+    margin-bottom: 6px;
+}
+
 .legal-note {
     margin: 2px 4px 8px;
     font-size: 0.72rem;

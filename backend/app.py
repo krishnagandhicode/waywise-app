@@ -583,6 +583,14 @@ def serve_script():
 def serve_style():
     return send_from_directory(str(STATIC_DIR / 'css'), 'style.css')
 
+@app.route('/robots.txt', methods=['GET'])
+def serve_robots():
+    return send_from_directory(str(STATIC_DIR), 'robots.txt')
+
+@app.route('/sitemap.xml', methods=['GET'])
+def serve_sitemap():
+    return send_from_directory(str(STATIC_DIR), 'sitemap.xml')
+
 @app.route('/health', methods=['GET'])
 def health():
     cleanup_geocode_cache()

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="WayWise favicon">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f79ff"/>
+      <stop offset="1" stop-color="#0b5be0"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="28" fill="url(#g)"/>
+  <text x="64" y="79" text-anchor="middle" font-family="Sora, Arial, sans-serif" font-size="64" font-weight="800" fill="#ffffff">W</text>
+</svg>

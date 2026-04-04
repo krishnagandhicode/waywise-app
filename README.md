@@ -1,6 +1,10 @@
 # WayWise AI - Real-Time Intelligent Navigation Assistant
 <img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/cbab8ea5-ac10-4b8e-a6e7-ed18387f86ec" />
 
+## Live App
+
+https://www.waywiseapp.tech
+
 ## Introduction
 
 WayWise AI is a full-stack web application designed to enhance long-distance driving by providing intelligent, on-route stop suggestions and simulating a real-time navigation experience. Unlike standard GPS tools that often suggest inconvenient detours, WayWise AI analyzes routes dynamically, considering the user's live location to recommend stops (restaurants, petrol pumps, etc.) that minimize extra travel time. It also features a live "current turn" display for a more intuitive navigation feel.
