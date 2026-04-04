@@ -3,7 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WayWise</title>
+    <title>WayWise | Smart Route Assistant</title>
+    <meta name="description" content="WayWise is a real-time navigation assistant with on-route stop discovery, convoy mode, and live route-aware suggestions.">
+    <meta name="keywords" content="WayWise, navigation assistant, route planner, convoy mode, on-route stops, map app">
+    <meta name="author" content="Krishna Gandhi">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://www.waywiseapp.tech/">
+
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="WayWise | Smart Route Assistant">
+    <meta property="og:description" content="Plan routes, discover on-route stops, and coordinate travel in real time with convoy mode.">
+    <meta property="og:url" content="https://www.waywiseapp.tech/">
+    <meta property="og:site_name" content="WayWise">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="WayWise | Smart Route Assistant">
+    <meta name="twitter:description" content="Real-time navigation with route-aware stop suggestions and convoy tracking.">
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "name": "WayWise",
+            "applicationCategory": "TravelApplication",
+            "operatingSystem": "Web",
+            "url": "https://www.waywiseapp.tech/",
+            "description": "WayWise is a real-time navigation assistant with on-route stop discovery, convoy mode, and live route-aware suggestions.",
+            "author": {
+                "@type": "Person",
+                "name": "Krishna Gandhi"
+            }
+        }
+    </script>
+
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,6 +104,15 @@
             <section id="stops-panel" class="card stops-panel">
                 <h3>Suggested Stops</h3>
                 <ul id="stops-ul"></ul>
+            </section>
+
+            <section class="card portfolio-highlights">
+                <h3>Why WayWise</h3>
+                <ul class="highlights-list">
+                    <li>Real-time route tracking with live turn updates.</li>
+                    <li>On-route stop discovery ranked by travel efficiency.</li>
+                    <li>Convoy mode for synchronized group navigation.</li>
+                </ul>
             </section>
 
             <section id="directions-panel" class="hidden">
