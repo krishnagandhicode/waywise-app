@@ -464,10 +464,14 @@ def get_decoded_route(origin, destination):
     if cached and (time.time() - cached["timestamp"] <= ROUTE_CACHE_TTL_SECONDS):
         return cached["coordinates"], cached["direction_steps"]
 
-    if is_free_provider_enabled():
-        decoded_coordinates, direction_steps = get_route_with_osrm(origin, destination)
-    else:
-        decoded_coordinates, direction_steps = get_route_with_google(origin, destination)
+    try:
+        if is_free_provider_enabled():
+            decoded_coordinates, direction_steps = get_route_with_osrm(origin, destination)
+        else:
+            decoded_coordinates, direction_steps = get_route_with_google(origin, destination)
+    except requests.exceptions.RequestException as e:
+        print(f"Routing API failed: {e}")
+        return None, None
 
     if decoded_coordinates and direction_steps:
         route_cache[cache_key] = {
