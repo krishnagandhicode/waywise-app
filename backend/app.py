@@ -76,6 +76,7 @@ CONVOY_MEMBER_TTL_SECONDS = int(os.getenv("CONVOY_MEMBER_TTL_SECONDS", "300"))
 CONVOY_ROOM_TTL_SECONDS = int(os.getenv("CONVOY_ROOM_TTL_SECONDS", "86400"))
 convoy_rooms = {}
 convoy_lock = Lock()
+overpass_lock = Lock()
 MOCK_LOCATION_HINTS = {
     "chandigarh": (30.7333, 76.7794),
     "s.a.s. nagar": (30.7046, 76.7179),
@@ -364,7 +365,8 @@ def find_places_with_overpass(route_coordinates, place_query):
                 data = response.json()
                 any_successful_response = True
                 if OVERPASS_API_URLS:
-                    OVERPASS_PREFERRED_INDEX = (OVERPASS_PREFERRED_INDEX + offset) % len(OVERPASS_API_URLS)
+                    with overpass_lock:
+                        OVERPASS_PREFERRED_INDEX = (OVERPASS_PREFERRED_INDEX + offset) % len(OVERPASS_API_URLS)
                 break
             except (requests.exceptions.RequestException, ValueError):
                 continue
