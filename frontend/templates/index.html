@@ -57,6 +57,9 @@
 
     <main class="app-shell">
         <aside class="control-panel">
+            <div class="sheet-handle" id="sheet-handle">
+                <div class="sheet-handle-bar"></div>
+            </div>
             <section class="card route-card">
                 <h2>Trip Setup</h2>
                 <div class="field-stack">
@@ -87,17 +90,22 @@
             </section>
 
             <section id="convoy-controls" class="card convoy-controls">
-                <h3>Convoy (Live)</h3>
-                <input type="text" id="convoy-name" placeholder="Your name">
-                <div class="convoy-row">
-                    <button id="convoy-create-btn" type="button">Create</button>
-                    <input type="text" id="convoy-room-id" placeholder="Room code">
-                    <button id="convoy-join-btn" type="button">Join</button>
-                </div>
-                <div id="convoy-session" class="convoy-session hidden">
-                    <p id="convoy-active-room" class="convoy-room-label"></p>
-                    <button id="convoy-leave-btn" type="button">Leave Convoy</button>
-                    <ul id="convoy-members-ul"></ul>
+                <button class="section-toggle" id="convoy-toggle-btn" aria-expanded="true">
+                    Convoy (Live)
+                    <span class="toggle-chevron" aria-hidden="true">▾</span>
+                </button>
+                <div class="section-body" id="convoy-body">
+                    <input type="text" id="convoy-name" placeholder="Your name">
+                    <div class="convoy-row">
+                        <button id="convoy-create-btn" type="button">Create</button>
+                        <input type="text" id="convoy-room-id" placeholder="Room code">
+                        <button id="convoy-join-btn" type="button">Join</button>
+                    </div>
+                    <div id="convoy-session" class="convoy-session hidden">
+                        <p id="convoy-active-room" class="convoy-room-label"></p>
+                        <button id="convoy-leave-btn" type="button">Leave Convoy</button>
+                        <ul id="convoy-members-ul"></ul>
+                    </div>
                 </div>
             </section>
 

@@ -67,6 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const convoySession = document.getElementById('convoy-session');
     const convoyActiveRoom = document.getElementById('convoy-active-room');
     const convoyMembersUl = document.getElementById('convoy-members-ul');
+    const convoyToggleBtn = document.getElementById('convoy-toggle-btn');
+    const convoyBody = document.getElementById('convoy-body');
+    const sheetHandle = document.getElementById('sheet-handle');
+    const controlPanel = document.querySelector('.control-panel');
 
     // --- EVENT LISTENERS ---
 
@@ -106,6 +110,24 @@ document.addEventListener('DOMContentLoaded', () => {
     convoyCreateBtn.addEventListener('click', createConvoy);
     convoyJoinBtn.addEventListener('click', joinConvoy);
     convoyLeaveBtn.addEventListener('click', leaveConvoy);
+
+    convoyToggleBtn.addEventListener('click', () => {
+        const isExpanded = convoyToggleBtn.getAttribute('aria-expanded') === 'true';
+        convoyToggleBtn.setAttribute('aria-expanded', String(!isExpanded));
+        convoyBody.classList.toggle('section-collapsed', isExpanded);
+    });
+
+    if (sheetHandle) {
+        sheetHandle.addEventListener('click', () => {
+            controlPanel.classList.toggle('sheet-expanded');
+        });
+    }
+
+    // On mobile, start with convoy section collapsed to keep the sheet tidy
+    if (window.innerWidth <= 640) {
+        convoyToggleBtn.setAttribute('aria-expanded', 'false');
+        convoyBody.classList.add('section-collapsed');
+    }
 
     convoyRoomInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
@@ -159,6 +181,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayRoute(routeData.route_coordinates);
                 inTripControls.classList.remove('hidden');
                 currentTurnPanel.classList.remove('hidden');
+                controlPanel.classList.add('navigating');
+                // On mobile, collapse the bottom sheet so the map is fully visible
+                if (window.innerWidth <= 640) {
+                    controlPanel.classList.remove('sheet-expanded');
+                }
                 startLiveTracking();
             } else {
                 alert('Could not find a route.');
@@ -203,9 +230,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.stops && data.stops.length > 0) {
                 data.stops.forEach(stop => {
                     const marker = L.marker([stop.location.lat, stop.location.lng]).addTo(markersLayer);
-                    marker.bindPopup(`<b>${stop.name}</b><br>Rating: ${stop.rating}<br>Distance: ${stop.distance}<br>Duration: ${stop.duration}`);
+                    marker.bindPopup(`<b>${stop.name}</b><br>Rating: ${stop.rating || 'N/A'}<br>${stop.distance} · ${stop.duration}`);
+
                     const li = document.createElement('li');
-                    li.innerHTML = `<strong>${stop.name}</strong><br>Rating: ${stop.rating || 'N/A'}<br>Distance: ${stop.distance} | Duration: ${stop.duration}`;
+                    li.className = 'stop-item';
+                    li.innerHTML = `<span class="stop-item-name">${stop.name}</span><span class="stop-item-meta">⭐ ${stop.rating || 'N/A'} · ${stop.distance} · ${stop.duration}</span>`;
+                    li.addEventListener('click', () => {
+                        map.flyTo([stop.location.lat, stop.location.lng], 16);
+                        marker.openPopup();
+                        // On mobile, collapse the sheet so the map is fully visible
+                        if (window.innerWidth <= 640) {
+                            controlPanel.classList.remove('sheet-expanded');
+                        }
+                    });
                     stopsUl.appendChild(li);
                 });
             } else {
@@ -234,10 +271,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!positionMarker) {
                     positionMarker = L.circleMarker(latLng, { radius: 8, color: 'blue', fillColor: '#3498db', fillOpacity: 1 }).addTo(map);
                     positionMarker.bindPopup("<b>You are here</b>").openPopup();
+                    // Zoom into user position when GPS first locks in
+                    map.setView(latLng, 15, { animate: true });
                 } else {
                     positionMarker.setLatLng(latLng);
+                    map.panTo(latLng);
                 }
-                map.panTo(latLng);
                 updateCurrentTurn(latLng);
 
                 if (convoyRoomId && convoyMemberId) {
@@ -298,16 +337,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayRoute(coordinates) {
         routeLayer = L.polyline(coordinates, { color: '#007bff', weight: 5 }).addTo(map);
-        map.fitBounds(routeLayer.getBounds());
+        const sheetHeight = window.innerWidth <= 640 ? 260 : 0;
+        map.fitBounds(routeLayer.getBounds(), {
+            paddingBottomRight: [0, sheetHeight],
+            paddingTopLeft: [0, 0],
+        });
         setTimeout(() => map.invalidateSize(), 120);
     }
 
     function resetUI() {
-        stopsUl.innerHTML = '';
+        // Intentionally does NOT clear stops/markers — those persist until a new search runs.
         currentTurnPanel.innerHTML = '';
         currentTurnPanel.classList.add('hidden');
         if (routeLayer) map.removeLayer(routeLayer);
-        markersLayer.clearLayers();
         if (positionMarker) {
             map.removeLayer(positionMarker);
             positionMarker = null;
@@ -317,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
             watchId = null;
         }
         inTripControls.classList.add('hidden');
+        controlPanel.classList.remove('navigating');
     }
 
     async function createConvoy() {
@@ -367,6 +410,14 @@ document.addEventListener('DOMContentLoaded', () => {
         convoySession.classList.remove('hidden');
         convoyActiveRoom.textContent = `Active Room: ${roomId}`;
         renderConvoyMembers(members);
+
+        // Always expand the convoy section when a session is active
+        convoyToggleBtn.setAttribute('aria-expanded', 'true');
+        convoyBody.classList.remove('section-collapsed');
+        // On mobile, expand the sheet so the user can see the convoy info
+        if (window.innerWidth <= 640) {
+            controlPanel.classList.add('sheet-expanded');
+        }
 
         if (convoySharedDestination) {
             applySharedDestination(convoySharedDestination);

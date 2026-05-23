@@ -314,8 +314,127 @@ button {
     font-size: 0.86rem;
 }
 
+.stop-item {
+    cursor: pointer;
+    position: relative;
+    padding-right: 28px;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    user-select: none;
+}
+
+.stop-item:hover {
+    background: #edf4ff;
+    border-color: #9bbfff;
+    transform: translateX(3px);
+}
+
+.stop-item:active {
+    transform: translateX(3px) scale(0.98);
+    background: #dfeeff;
+}
+
+.stop-item::after {
+    content: '→';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.stop-item-name {
+    display: block;
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #0c2d70;
+    line-height: 1.3;
+}
+
+.stop-item-meta {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 3px;
+}
+
 .portfolio-highlights {
     border-style: dashed;
+}
+
+.section-toggle {
+    display: flex;
+    width: 100%;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    padding: 6px 8px;
+    margin: -6px -8px 6px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.93rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #223054;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.15s ease;
+}
+
+.section-toggle:hover {
+    background: rgba(11, 91, 224, 0.07);
+}
+
+.section-toggle:active {
+    background: rgba(11, 91, 224, 0.12);
+}
+
+.section-toggle[aria-expanded="true"] {
+    margin-bottom: 6px;
+}
+
+.toggle-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(11, 91, 224, 0.1);
+    color: var(--primary);
+    font-size: 0.8rem;
+    font-style: normal;
+    transition: transform 0.22s ease, background 0.15s ease;
+    flex-shrink: 0;
+}
+
+.section-toggle:hover .toggle-chevron {
+    background: rgba(11, 91, 224, 0.18);
+}
+
+.section-toggle[aria-expanded="false"] .toggle-chevron {
+    transform: rotate(-90deg);
+}
+
+.section-body.section-collapsed {
+    display: none;
+}
+
+.sheet-handle {
+    display: none;
+}
+
+.sheet-handle-bar {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(15, 23, 42, 0.18);
+}
+
+.control-panel.navigating .portfolio-highlights {
+    display: none;
 }
 
 .highlights-list {
@@ -419,10 +538,52 @@ button {
     }
 }
 
+/* Tablet-specific: touch targets and proportions */
+@media (min-width: 641px) and (max-width: 1024px) {
+    .map-container {
+        height: 62vh;
+        min-height: 62vh;
+    }
+
+    input[type="text"] {
+        height: 50px;
+        font-size: 0.95rem;
+    }
+
+    #start-nav-btn {
+        height: 54px;
+        font-size: 1rem;
+    }
+
+    .stop-btn {
+        height: 48px;
+        font-size: 0.88rem;
+    }
+
+    .stop-buttons {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    #custom-query-btn {
+        height: 50px;
+    }
+
+    #convoy-create-btn,
+    #convoy-join-btn,
+    #convoy-leave-btn {
+        height: 48px;
+    }
+
+    .card {
+        padding: 16px;
+    }
+}
+
 @media (max-width: 640px) {
     .topbar {
-        height: 66px;
-        padding: 10px 12px;
+        height: 56px;
+        padding: 8px 12px;
     }
 
     .brand-subtitle {
@@ -430,30 +591,163 @@ button {
     }
 
     .backend-status {
-        max-width: 56%;
+        max-width: 52%;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        font-size: 0.7rem;
+        padding: 6px 10px;
     }
 
+    body {
+        overflow: hidden;
+    }
+
+    /* Bottom sheet layout: map fills screen, panel floats over bottom */
     .app-shell {
-        padding-top: 66px;
+        position: fixed;
+        top: 56px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: block;
+        padding-top: 0;
+        overflow: hidden;
+        height: auto;
+        min-height: 0;
     }
 
+    .map-container {
+        position: absolute;
+        inset: 0;
+        height: 100%;
+        min-height: 0;
+    }
+
+    /* Sheet handle visible on mobile */
+    .sheet-handle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 12px 0 6px;
+        cursor: pointer;
+        flex-shrink: 0;
+        order: -100; /* always first in flex column */
+    }
+
+    .sheet-handle-bar {
+        width: 44px;
+        height: 5px;
+        border-radius: 3px;
+        background: rgba(15, 23, 42, 0.22);
+    }
+
+    /* Panel as bottom sheet — collapsed by default, translated down */
     .control-panel {
-        padding: 12px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 84vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 22px 22px 0 0;
+        border-right: 0;
+        border-top: 1px solid rgba(11, 91, 224, 0.18);
+        border-bottom: 0;
+        box-shadow: 0 -6px 28px rgba(10, 35, 90, 0.14);
+        z-index: 1200;
+        padding: 0 12px 32px;
+        gap: 12px;
+        transform: translateY(calc(84vh - 248px));
+        transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .control-panel.sheet-expanded {
+        transform: translateY(0);
+    }
+
+    /* When navigating, bump the collapsed height slightly to show stop buttons */
+    .control-panel.navigating {
+        transform: translateY(calc(84vh - 288px));
+    }
+
+    .control-panel.navigating.sheet-expanded {
+        transform: translateY(0);
+    }
+
+    /* In-trip controls move above route card when navigating */
+    .control-panel.navigating #in-trip-controls {
+        order: -1;
     }
 
     .card {
-        border-radius: 16px;
+        border-radius: 14px;
         padding: 12px;
     }
 
+    /* Touch-friendly sizes */
+    #start-nav-btn {
+        height: 54px;
+        font-size: 1rem;
+    }
+
+    .stop-btn {
+        height: 50px;
+        font-size: 0.88rem;
+        border-radius: 14px;
+    }
+
     .stop-buttons {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    input[type="text"] {
+        height: 50px;
+        font-size: 0.95rem;
+    }
+
+    #custom-query-btn {
+        height: 50px;
+    }
+
+    .location-btn {
+        height: 36px;
+        font-size: 0.74rem;
     }
 
     .convoy-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: auto 1fr auto;
+        gap: 8px;
+    }
+
+    #convoy-create-btn,
+    #convoy-join-btn {
+        height: 50px;
+        padding: 0 14px;
+        border-radius: 12px;
+    }
+
+    #convoy-leave-btn {
+        height: 50px;
+    }
+
+    /* Turn panel: full-width at top of visible map area */
+    #current-turn-panel {
+        top: 10px;
+        left: 8px;
+        right: 8px;
+        width: auto;
+        transform: none;
+        max-width: none;
+    }
+
+    #current-turn-panel .turn-instruction {
+        font-size: 1.15rem;
+    }
+
+    #current-turn-panel .next-turn-info {
+        font-size: 0.88rem;
     }
 }
