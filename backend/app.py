@@ -37,6 +37,7 @@ DIRECTIONS_API_URL = "https://maps.googleapis.com/maps/api/directions/json"
 PLACES_API_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 DISTANCE_MATRIX_API_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 MAP_PROVIDER = os.getenv("WAYWISE_MAP_PROVIDER", "free").strip().lower()
+GOOGLE_FALLBACK_ENABLED = os.getenv("WAYWISE_ENABLE_GOOGLE_FALLBACK", "true").lower() in ("1", "true", "yes", "on")
 NOMINATIM_SEARCH_URL = os.getenv("NOMINATIM_SEARCH_URL", "https://nominatim.openstreetmap.org/search")
 OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "https://router.project-osrm.org")
 OVERPASS_API_URL = os.getenv("OVERPASS_API_URL", "https://overpass-api.de/api/interpreter")
@@ -93,6 +94,19 @@ MOCK_LOCATION_HINTS = {
 
 def is_free_provider_enabled():
     return MAP_PROVIDER in {"free", "osm", "osrm"}
+
+def is_google_provider_enabled():
+    return MAP_PROVIDER == "google"
+
+def get_provider_chain():
+    if is_free_provider_enabled():
+        return ["free"]
+    if is_google_provider_enabled():
+        chain = ["google"]
+        if GOOGLE_FALLBACK_ENABLED:
+            chain.append("free")
+        return chain
+    return ["google"]
 
 def cleanup_stop_candidate_cache(now=None):
     current_time = now or time.time()
@@ -255,17 +269,20 @@ def geocode_with_nominatim(location_text):
     return dict(result)
 
 def get_route_with_google(origin, destination):
+    if not API_KEY:
+        raise ValueError("Google Maps API key is not configured")
     params = {"origin": origin, "destination": destination, "key": API_KEY}
     response = requests.get(DIRECTIONS_API_URL, params=params, timeout=15)
     response.raise_for_status()
     data = response.json()
-    if data['status'] == 'OK' and data.get('routes'):
-        route = data['routes'][0]['legs'][0]
-        encoded_polyline = data['routes'][0]['overview_polyline']['points']
+    status = data.get("status")
+    if status == "OK" and data.get("routes"):
+        route = data["routes"][0]["legs"][0]
+        encoded_polyline = data["routes"][0]["overview_polyline"]["points"]
         decoded_coordinates = polyline.decode(encoded_polyline)
-        direction_steps = [strip_html_tags(step.get('html_instructions')) for step in route.get('steps', [])]
+        direction_steps = [strip_html_tags(step.get("html_instructions")) for step in route.get("steps", [])]
         return decoded_coordinates, direction_steps
-    return None, None
+    raise ValueError(f"Google Directions API returned status: {status}")
 
 def get_route_with_osrm(origin, destination):
     origin_geo = geocode_with_nominatim(origin)
@@ -461,25 +478,35 @@ def rank_stops_with_fallback(stops, ranking_origin):
 
 def get_decoded_route(origin, destination):
     """Fetches and decodes the route, and also extracts direction steps."""
-    cache_key = f"{MAP_PROVIDER}::{origin.strip().lower()}::{destination.strip().lower()}"
-    cached = route_cache.get(cache_key)
-    if cached and (time.time() - cached["timestamp"] <= ROUTE_CACHE_TTL_SECONDS):
-        return cached["coordinates"], cached["direction_steps"]
+    last_exception = None
 
-    if is_free_provider_enabled():
-        decoded_coordinates, direction_steps = get_route_with_osrm(origin, destination)
-    else:
-        decoded_coordinates, direction_steps = get_route_with_google(origin, destination)
+    for provider in get_provider_chain():
+        cache_key = f"{provider}::{origin.strip().lower()}::{destination.strip().lower()}"
+        cached = route_cache.get(cache_key)
+        if cached and (time.time() - cached["timestamp"] <= ROUTE_CACHE_TTL_SECONDS):
+            return cached["coordinates"], cached["direction_steps"], provider
 
-    if decoded_coordinates and direction_steps:
-        route_cache[cache_key] = {
-            "timestamp": time.time(),
-            "coordinates": decoded_coordinates,
-            "direction_steps": direction_steps,
-        }
-        return decoded_coordinates, direction_steps
+        try:
+            if provider == "free":
+                decoded_coordinates, direction_steps = get_route_with_osrm(origin, destination)
+            else:
+                decoded_coordinates, direction_steps = get_route_with_google(origin, destination)
+        except (requests.exceptions.RequestException, ValueError) as exc:
+            last_exception = exc
+            continue
 
-    return None, None
+        if decoded_coordinates and direction_steps:
+            route_cache[cache_key] = {
+                "timestamp": time.time(),
+                "coordinates": decoded_coordinates,
+                "direction_steps": direction_steps,
+            }
+            return decoded_coordinates, direction_steps, provider
+
+    if last_exception:
+        raise last_exception
+
+    return None, None, None
 
 def resolve_mock_location(location_text, fallback):
     """Resolves common city/location text to a mock coordinate."""
@@ -660,7 +687,7 @@ def find_stops():
                 "directions": direction_steps
             })
 
-        route_coordinates, direction_steps = get_decoded_route(origin, destination)
+        route_coordinates, direction_steps, _route_provider = get_decoded_route(origin, destination)
 
         if not route_coordinates:
             if route_only:
