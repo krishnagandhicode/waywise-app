@@ -758,27 +758,40 @@ def find_stops():
                 if overpass_unavailable:
                     provider_notice = "Free stop search provider is temporarily rate-limited. Please retry in a few seconds."
         else:
-            all_candidates = {}
-            search_interval = 50
-            for i in range(0, len(route_coordinates), search_interval):
-                midpoint = route_coordinates[i]
-                places_params = {
-                    "location": f"{midpoint[0]},{midpoint[1]}", "radius": 15000,
-                    "keyword": place_query, "key": API_KEY
-                }
-                places_response = requests.get(PLACES_API_URL, params=places_params, timeout=15)
-                places_data = places_response.json()
-                if places_data['status'] == 'OK':
-                    for place in places_data['results']:
-                        all_candidates[place['place_id']] = place
+            stop_cache_key = get_stop_cache_key(origin, destination, place_query)
+            cached_stop_data = stop_candidate_cache.get(stop_cache_key)
+            if cached_stop_data and (time.time() - cached_stop_data["timestamp"] <= STOP_CACHE_TTL_SECONDS):
+                on_route_stops = copy.deepcopy(cached_stop_data.get("stops", []))
+            else:
+                all_candidates = {}
+                search_interval = 50
+                for i in range(0, len(route_coordinates), search_interval):
+                    midpoint = route_coordinates[i]
+                    places_params = {
+                        "location": f"{midpoint[0]},{midpoint[1]}", "radius": 15000,
+                        "keyword": place_query, "key": API_KEY
+                    }
+                    places_response = requests.get(PLACES_API_URL, params=places_params, timeout=15)
+                    places_data = places_response.json()
+                    status = places_data.get("status")
+                    if status == "OK":
+                        for place in places_data.get("results", []):
+                            all_candidates[place["place_id"]] = place
+                    elif status in {"REQUEST_DENIED", "OVER_DAILY_LIMIT", "OVER_QUERY_LIMIT", "INVALID_REQUEST"}:
+                        raise ValueError(f"Google Places API returned status: {status}")
 
-            for place in all_candidates.values():
-                place_loc = place.get('geometry', {}).get('location')
-                if place_loc and is_on_route(place_loc, route_coordinates):
-                    on_route_stops.append({
-                        "name": place.get('name'), "rating": place.get('rating', 'N/A'),
-                        "place_id": place.get('place_id'), "location": place_loc
-                    })
+                for place in all_candidates.values():
+                    place_loc = place.get("geometry", {}).get("location")
+                    if place_loc and is_on_route(place_loc, route_coordinates):
+                        on_route_stops.append({
+                            "name": place.get("name"), "rating": place.get("rating", "N/A"),
+                            "place_id": place.get("place_id"), "location": place_loc
+                        })
+
+                stop_candidate_cache[stop_cache_key] = {
+                    "timestamp": time.time(),
+                    "stops": copy.deepcopy(on_route_stops),
+                }
 
         current_route_index = None
         if live_lat and live_lng and on_route_stops:
