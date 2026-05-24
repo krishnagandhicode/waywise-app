@@ -36,14 +36,43 @@ export function getCurrentTurnInfo(routeCoordinates, directionSteps, currentLatL
     };
 }
 
+const TURN_ARROWS = {
+    left: '<path d="M11 5 4 12l7 7"/><path d="M4 12h12a4 4 0 0 1 4 4v2"/>',
+    right: '<path d="m13 5 7 7-7 7"/><path d="M20 12H8a4 4 0 0 0-4 4v2"/>',
+    destination: '<path d="M12 21s-6-5.7-6-10a6 6 0 0 1 12 0c0 4.3-6 10-6 10Z"/><circle cx="12" cy="11" r="2"/>',
+    straight: '<path d="M12 19V5"/><path d="m6 11 6-6 6 6"/>',
+};
+
+function pickArrow(instruction) {
+    const text = (instruction || '').toLowerCase();
+    if (text.includes('arriv') || text.includes('destination') || text.includes('nearing')) {
+        return TURN_ARROWS.destination;
+    }
+    if (text.includes('left')) return TURN_ARROWS.left;
+    if (text.includes('right')) return TURN_ARROWS.right;
+    return TURN_ARROWS.straight;
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[char]));
+}
+
 export function renderCurrentTurn(panelElement, turnInfo) {
     if (!turnInfo) {
         panelElement.innerHTML = '';
         return;
     }
 
+    const arrowPaths = pickArrow(turnInfo.currentInstruction);
     panelElement.innerHTML = `
-        <p class="turn-instruction">${turnInfo.currentInstruction}</p>
-        <p class="next-turn-info">Next: ${turnInfo.nextInstruction}</p>
+        <span class="turn-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${arrowPaths}</svg>
+        </span>
+        <span class="turn-text">
+            <p class="turn-instruction">${escapeHtml(turnInfo.currentInstruction)}</p>
+            <p class="next-turn-info">Next: ${escapeHtml(turnInfo.nextInstruction)}</p>
+        </span>
     `;
 }
