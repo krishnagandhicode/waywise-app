@@ -858,6 +858,32 @@ button {
     display: none;
 }
 
+/* Live driver heading arrow */
+.nav-arrow-icon {
+    background: none;
+    border: 0;
+}
+
+.nav-arrow-rot {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+    transform-origin: 50% 50%;
+}
+
+.nav-arrow-rot svg {
+    width: 32px;
+    height: 32px;
+    fill: #2563eb;
+    stroke: #ffffff;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
 .leaflet-tooltip.convoy-label {
     background: #0f172a;
     color: #ffffff;
