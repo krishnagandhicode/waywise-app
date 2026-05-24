@@ -185,6 +185,10 @@ body {
     font-weight: 700;
 }
 
+.backend-status .status-compact {
+    display: none;
+}
+
 .status-good {
     background: var(--success-bg);
     border-color: var(--success-border);
@@ -955,12 +959,17 @@ button {
     }
 
     .backend-status {
-        max-width: 100%;
         white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
         font-size: 0.7rem;
         padding: 6px 10px;
+    }
+
+    .backend-status .status-full {
+        display: none;
+    }
+
+    .backend-status .status-compact {
+        display: inline;
     }
 
     .theme-toggle {

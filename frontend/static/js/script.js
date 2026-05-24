@@ -177,12 +177,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             backendStatus.classList.remove('status-bad');
             backendStatus.classList.add('status-good');
-            backendStatus.textContent = `Backend: online | Provider: ${data.provider} | Mock: ${data.mock_mode ? 'yes' : 'no'}`;
+            const full = `Backend: online | Provider: ${data.provider} | Mock: ${data.mock_mode ? 'yes' : 'no'}`;
+            setBackendStatusText(full, 'Online');
         } catch (error) {
             backendStatus.classList.remove('status-good');
             backendStatus.classList.add('status-bad');
-            backendStatus.textContent = 'Backend: offline or unreachable';
+            setBackendStatusText('Backend: offline or unreachable', 'Offline');
         }
+    }
+
+    function setBackendStatusText(full, compact) {
+        backendStatus.innerHTML = '';
+        const fullSpan = document.createElement('span');
+        fullSpan.className = 'status-full';
+        fullSpan.textContent = full;
+        const compactSpan = document.createElement('span');
+        compactSpan.className = 'status-compact';
+        compactSpan.textContent = compact;
+        backendStatus.append(fullSpan, compactSpan);
     }
 
     async function startNavigation(options = {}) {
