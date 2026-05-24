@@ -1,4 +1,5 @@
 const DEFAULT_DURATION = 4000;
+const MAX_TOASTS = 3;
 
 function getContainer() {
     return document.getElementById('toast-container');
@@ -11,8 +12,19 @@ export function showToast(message, type = 'info', duration = DEFAULT_DURATION) {
         return;
     }
 
+    // Skip if an identical message is already on screen (prevents spam from rapid clicks).
+    const visible = container.querySelectorAll('.toast');
+    if ([...visible].some((t) => t.dataset.message === message)) {
+        return;
+    }
+    // Cap concurrent toasts so they never pile up — drop the oldest.
+    if (visible.length >= MAX_TOASTS) {
+        visible[0].remove();
+    }
+
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
+    toast.dataset.message = message;
     toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
     toast.textContent = message;
     container.appendChild(toast);
