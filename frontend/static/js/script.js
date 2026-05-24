@@ -64,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let directionSteps = [];
     let routeLayer = null;
     let positionMarker = null;
+    let positionMarkerIsArrow = false;
+    let lastHeading = null;
     let watchId = null;
     let lastKnownPosition = null;
     let convoyRoomId = null;
@@ -322,13 +324,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastKnownPosition = position;
                 const latLng = [position.coords.latitude, position.coords.longitude];
 
-                if (!positionMarker) {
-                    positionMarker = L.circleMarker(latLng, { radius: 8, color: 'blue', fillColor: '#3498db', fillOpacity: 1 }).addTo(map);
-                    positionMarker.bindPopup("<b>You are here</b>").openPopup();
+                const isFirstFix = !positionMarker;
+                updatePositionMarker(latLng, position.coords.heading);
+                if (isFirstFix) {
                     // Zoom into user position when GPS first locks in
                     map.setView(latLng, 15, { animate: true });
                 } else {
-                    positionMarker.setLatLng(latLng);
                     map.panTo(latLng);
                 }
                 updateCurrentTurn(latLng);
@@ -345,6 +346,47 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
+    }
+
+    function createHeadingArrowIcon(heading) {
+        return L.divIcon({
+            className: 'nav-arrow-icon',
+            html: `<div class="nav-arrow-rot" style="transform: rotate(${heading}deg)">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2 4 21l8-4 8 4z"/></svg>
+            </div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
+        });
+    }
+
+    // Show a plain dot until the device reports a real heading, then a rotating arrow.
+    // Once upgraded to an arrow we keep it (retaining the last heading) to avoid flicker when stationary.
+    function updatePositionMarker(latLng, heading) {
+        const hasHeading = typeof heading === 'number' && !Number.isNaN(heading);
+
+        if (hasHeading) {
+            lastHeading = heading;
+            if (!positionMarker || !positionMarkerIsArrow) {
+                if (positionMarker) map.removeLayer(positionMarker);
+                positionMarker = L.marker(latLng, { icon: createHeadingArrowIcon(heading), zIndexOffset: 1000 }).addTo(map);
+                positionMarker.bindPopup('<b>You are here</b>');
+                positionMarkerIsArrow = true;
+            } else {
+                positionMarker.setLatLng(latLng);
+                const rot = positionMarker.getElement()?.querySelector('.nav-arrow-rot');
+                if (rot) rot.style.transform = `rotate(${heading}deg)`;
+            }
+            return;
+        }
+
+        if (!positionMarker) {
+            positionMarker = L.circleMarker(latLng, { radius: 8, color: '#1d4ed8', fillColor: '#3498db', fillOpacity: 1, weight: 2 }).addTo(map);
+            positionMarker.bindPopup('<b>You are here</b>').openPopup();
+            positionMarkerIsArrow = false;
+        } else {
+            // No fresh heading: just move whatever marker we already have (dot or last arrow).
+            positionMarker.setLatLng(latLng);
+        }
     }
 
     function updateCurrentTurn(currentLatLng) {
@@ -410,6 +452,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (positionMarker) {
             map.removeLayer(positionMarker);
             positionMarker = null;
+            positionMarkerIsArrow = false;
+            lastHeading = null;
         }
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
