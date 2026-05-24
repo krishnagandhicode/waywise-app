@@ -1,5 +1,5 @@
 import { buildApiUrl, fetchJson } from './modules/api.js';
-import { createMap, getCurrentTurnInfo, renderCurrentTurn } from './modules/map.js';
+import { createMap, getCurrentTurnInfo, renderCurrentTurn, renderTurnStatus } from './modules/map.js';
 import { renderConvoyMembersUI } from './modules/convoy.js';
 import { showToast } from './modules/toast.js';
 
@@ -210,6 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayRoute(routeData.route_coordinates);
                 inTripControls.classList.remove('hidden');
                 currentTurnPanel.classList.remove('hidden');
+                renderTurnStatus(currentTurnPanel, 'Acquiring your location…', { busy: true });
                 controlPanel.classList.add('navigating');
                 // On mobile, collapse the bottom sheet so the map is fully visible
                 if (window.innerWidth <= 640) {
@@ -297,7 +298,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startLiveTracking() {
-        if (!navigator.geolocation) return;
+        if (!navigator.geolocation) {
+            renderTurnStatus(currentTurnPanel, 'Live tracking unavailable — your browser does not support location.');
+            return;
+        }
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
         }
@@ -323,7 +327,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             },
-            () => { showToast('Could not get your location. Live tracking failed.', 'error'); },
+            () => {
+                showToast('Could not get your location. Live tracking failed.', 'error');
+                renderTurnStatus(currentTurnPanel, 'Live tracking unavailable — enable location access for turn-by-turn.');
+            },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     }

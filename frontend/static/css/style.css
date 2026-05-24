@@ -575,6 +575,15 @@ button {
     padding: 0 16px;
 }
 
+#stops-ul li.stops-empty {
+    border: 0;
+    background: none;
+    padding: 4px 2px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
 .portfolio-highlights {
     border-style: dashed;
 }
@@ -651,6 +660,15 @@ button {
 
 .control-panel.navigating .portfolio-highlights {
     display: none;
+}
+
+/* While navigating, surface the active controls + results above the convoy card */
+.control-panel.navigating #in-trip-controls {
+    order: -2;
+}
+
+.control-panel.navigating #stops-panel {
+    order: -1;
 }
 
 .highlights-list {
@@ -740,6 +758,29 @@ button {
     font-weight: 600;
 }
 
+.turn-arrow-muted {
+    background: var(--accent-tint-strong);
+    color: var(--primary);
+    box-shadow: none;
+}
+
+.turn-status {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--hud-next);
+    line-height: 1.25;
+}
+
+.hud-spinner {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-tint-strong);
+    border-top-color: var(--primary);
+    animation: ww-spin 0.7s linear infinite;
+}
+
 /* Toast notifications */
 .toast-container {
     position: fixed;
@@ -825,6 +866,11 @@ button {
 
 .leaflet-tooltip.convoy-label:before {
     border-top-color: #0f172a;
+}
+
+/* Dark-mode map: tint only the raster tiles, leaving route + markers untouched */
+[data-theme="dark"] .leaflet-tile {
+    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -998,11 +1044,6 @@ button {
 
     .control-panel.navigating.sheet-expanded {
         transform: translateY(0);
-    }
-
-    /* In-trip controls move above route card when navigating */
-    .control-panel.navigating #in-trip-controls {
-        order: -1;
     }
 
     .card {

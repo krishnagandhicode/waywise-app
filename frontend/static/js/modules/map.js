@@ -59,6 +59,18 @@ function escapeHtml(value) {
     }[char]));
 }
 
+export function renderTurnStatus(panelElement, message, { busy = false } = {}) {
+    const icon = busy
+        ? '<span class="hud-spinner"></span>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M11 12h1v4h1"/></svg>';
+    panelElement.innerHTML = `
+        <span class="turn-arrow turn-arrow-muted" aria-hidden="true">${icon}</span>
+        <span class="turn-text">
+            <p class="turn-status">${escapeHtml(message)}</p>
+        </span>
+    `;
+}
+
 export function renderCurrentTurn(panelElement, turnInfo) {
     if (!turnInfo) {
         panelElement.innerHTML = '';
