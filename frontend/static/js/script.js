@@ -1,8 +1,34 @@
 import { buildApiUrl, fetchJson } from './modules/api.js';
 import { createMap, getCurrentTurnInfo, renderCurrentTurn } from './modules/map.js';
 import { renderConvoyMembersUI } from './modules/convoy.js';
+import { showToast } from './modules/toast.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    // --- THEME ---
+    const THEME_KEY = 'waywise-theme';
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = themeToggle?.querySelector('.theme-toggle-icon');
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        if (themeIcon) themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+        if (themeToggle) {
+            themeToggle.title = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+        }
+    }
+
+    const storedTheme = localStorage.getItem(THEME_KEY);
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    applyTheme(storedTheme || (prefersDark ? 'dark' : 'light'));
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+            const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+            localStorage.setItem(THEME_KEY, next);
+        });
+    }
 
     function setStopSearchLoading(isLoading) {
         const stopBtns = document.querySelectorAll('.stop-btn');
@@ -90,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (query) {
             findAndDisplayStops(query);
         } else {
-            alert('Please enter something to search for.');
+            showToast('Please enter something to search for.', 'error');
         }
     });
 
@@ -163,7 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const { suppressConvoySync = false } = options;
         const origin = originInput.value;
         const destination = destinationInput.value;
-        if (!origin || !destination) return alert('Please fill out Origin and Destination.');
+        if (!origin || !destination) {
+            showToast('Please fill out both Origin and Destination.', 'error');
+            return;
+        }
 
         if (convoyRoomId && convoyMemberId && !suppressConvoySync) {
             syncConvoyDestination(destination).catch((error) => {
@@ -187,12 +216,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     controlPanel.classList.remove('sheet-expanded');
                 }
                 startLiveTracking();
+                showToast('Route ready — navigation started.', 'success');
             } else {
-                alert('Could not find a route.');
+                showToast('Could not find a route between those locations.', 'error');
             }
         } catch (error) {
             console.error('Error starting navigation:', error);
-            alert('Could not start navigation. Please try again.');
+            showToast('Could not start navigation. Please try again.', 'error');
         } finally {
             startNavBtn.textContent = 'Start Navigation';
             startNavBtn.disabled = false;
@@ -200,7 +230,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function findAndDisplayStops(query) {
-        stopsUl.innerHTML = `<li>Searching for '${query}'...</li>`;
+        stopsUl.innerHTML = '';
+        const loadingItem = document.createElement('li');
+        loadingItem.className = 'stops-status';
+        const spinner = document.createElement('span');
+        spinner.className = 'stops-spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+        loadingItem.appendChild(spinner);
+        loadingItem.appendChild(document.createTextNode(`Searching for "${query}"...`));
+        stopsUl.appendChild(loadingItem);
         markersLayer.clearLayers();
         customQueryInput.value = ''; // Clear input after search
         setStopSearchLoading(true);
@@ -285,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             },
-            () => { alert("Could not get your location. Live tracking failed."); },
+            () => { showToast('Could not get your location. Live tracking failed.', 'error'); },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     }
@@ -298,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setInputToCurrentLocation(inputElement, options = {}) {
         const { silent = false } = options;
         if (!navigator.geolocation) {
-            if (!silent) alert("Geolocation is not supported by your browser.");
+            if (!silent) showToast('Geolocation is not supported by your browser.', 'error');
             return Promise.reject(new Error('Geolocation is not supported by your browser.'));
         }
 
@@ -317,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 resolve(inputElement.value);
             }, () => {
-                if (!silent) alert("Unable to retrieve your location.");
+                if (!silent) showToast('Unable to retrieve your location.', 'error');
                 inputElement.placeholder = "Enter Origin";
                 reject(new Error('Unable to retrieve current location.'));
             });
@@ -375,15 +413,16 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error(data.error || 'Unable to create convoy.');
             activateConvoy(data.room_id, data.member_id, data.members || [], data.destination || null);
+            showToast(`Convoy created — room ${data.room_id}.`, 'success');
         } catch (error) {
-            alert(error.message || 'Unable to create convoy.');
+            showToast(error.message || 'Unable to create convoy.', 'error');
         }
     }
 
     async function joinConvoy() {
         const roomId = convoyRoomInput.value.trim().toUpperCase();
         if (!roomId) {
-            alert('Enter a room code first.');
+            showToast('Enter a room code first.', 'error');
             return;
         }
         try {
@@ -397,8 +436,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error(data.error || 'Unable to join convoy.');
             activateConvoy(data.room_id, data.member_id, data.members || [], data.destination || null);
+            showToast(`Joined convoy ${data.room_id}.`, 'success');
         } catch (error) {
-            alert(error.message || 'Unable to join convoy.');
+            showToast(error.message || 'Unable to join convoy.', 'error');
         }
     }
 
