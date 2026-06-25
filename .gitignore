@@ -1,5 +1,7 @@
-# Environment variables
+# Environment variables (ignore all .env variants, but keep *.example templates)
 .env
+.env.*
+!.env.*.example
 
 # Python virtual environment
 venv/
