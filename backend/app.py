@@ -829,6 +829,11 @@ def find_stops():
                 except requests.exceptions.RequestException:
                     on_route_stops = rank_stops_with_fallback(on_route_stops, ranking_origin)
             else:
+                # Google Distance Matrix caps destinations per request, so trim the
+                # candidate list before building the matrix call. Without this, a long
+                # route with many on-route stops produces an over-limit request that
+                # fails and silently returns unranked stops.
+                on_route_stops = on_route_stops[:DISTANCE_MATRIX_MAX_DESTINATIONS]
                 ranking_origin = f"{live_lat},{live_lng}" if (live_lat and live_lng) else origin
                 destination_coords = "|".join([f"{stop['location']['lat']},{stop['location']['lng']}" for stop in on_route_stops])
                 matrix_params = { "origins": ranking_origin, "destinations": destination_coords, "key": API_KEY, "units": "metric" }
