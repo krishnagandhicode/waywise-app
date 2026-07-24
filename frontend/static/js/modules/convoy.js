@@ -1,3 +1,5 @@
+import { escapeHtml } from './map.js';
+
 export function getMemberJitter(memberId) {
     let hash = 0;
     for (let i = 0; i < memberId.length; i += 1) {
@@ -56,8 +58,9 @@ export function renderConvoyMembersUI({
                 });
             }
 
-            marker.bindPopup(`<b>${label}</b><br>${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`);
-            marker.bindTooltip(label, {
+            const safeLabel = escapeHtml(label);
+            marker.bindPopup(`<b>${safeLabel}</b><br>${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`);
+            marker.bindTooltip(safeLabel, {
                 permanent: true,
                 direction: 'top',
                 offset: [0, -12],
