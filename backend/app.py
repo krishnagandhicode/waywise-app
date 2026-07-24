@@ -52,6 +52,7 @@ OVERPASS_API_URLS = [
 FREE_ROUTE_SEARCH_INTERVAL = int(os.getenv("FREE_ROUTE_SEARCH_INTERVAL", "220"))
 FREE_STOP_SEARCH_RADIUS_METERS = int(os.getenv("FREE_STOP_SEARCH_RADIUS_METERS", "1200"))
 FREE_MAX_SEARCH_POINTS = int(os.getenv("FREE_MAX_SEARCH_POINTS", "8"))
+GOOGLE_MAX_SEARCH_POINTS = int(os.getenv("GOOGLE_MAX_SEARCH_POINTS", "8"))
 FREE_OVERPASS_QUERY_TIMEOUT_SECONDS = int(os.getenv("FREE_OVERPASS_QUERY_TIMEOUT_SECONDS", "8"))
 FREE_OVERPASS_HTTP_TIMEOUT_SECONDS = int(os.getenv("FREE_OVERPASS_HTTP_TIMEOUT_SECONDS", "7"))
 FREE_OVERPASS_ELEMENT_LIMIT = int(os.getenv("FREE_OVERPASS_ELEMENT_LIMIT", "25"))
@@ -764,8 +765,15 @@ def find_stops():
                 on_route_stops = copy.deepcopy(cached_stop_data.get("stops", []))
             else:
                 all_candidates = {}
-                search_interval = 50
-                for i in range(0, len(route_coordinates), search_interval):
+                # Cap Places sample points (and spread them across the whole route) so
+                # billed call volume stays bounded regardless of route length. The free
+                # path caps via FREE_MAX_SEARCH_POINTS; mirror that for the Google path.
+                if len(route_coordinates) > GOOGLE_MAX_SEARCH_POINTS:
+                    search_interval = max(len(route_coordinates) // GOOGLE_MAX_SEARCH_POINTS, 1)
+                    sampled_indices = list(range(0, len(route_coordinates), search_interval))[:GOOGLE_MAX_SEARCH_POINTS]
+                else:
+                    sampled_indices = list(range(len(route_coordinates)))
+                for i in sampled_indices:
                     midpoint = route_coordinates[i]
                     places_params = {
                         "location": f"{midpoint[0]},{midpoint[1]}", "radius": 15000,
