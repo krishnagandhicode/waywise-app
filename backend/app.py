@@ -717,19 +717,21 @@ def find_stops():
                 "directions": direction_steps
             })
 
-        ranked_cache_key = None
-        if is_free_provider_enabled():
-            ranked_cache_key = get_ranked_stops_cache_key(origin, destination, place_query, live_lat, live_lng)
-            ranked_cached = ranked_stops_cache.get(ranked_cache_key)
-            if ranked_cached and (time.time() - ranked_cached.get("timestamp", 0) <= RANKED_STOPS_CACHE_TTL_SECONDS):
-                return jsonify({
-                    "status": "success",
-                    "search_query": place_query,
-                    "on_route_stops_found": len(ranked_cached.get("stops", [])),
-                    "stops": copy.deepcopy(ranked_cached.get("stops", [])),
-                    "route_coordinates": route_coordinates,
-                    "directions": direction_steps
-                })
+        # Ranked-stop cache applies to both providers. The key is prefixed with
+        # MAP_PROVIDER (via get_stop_cache_key), so free and google entries never
+        # collide. On the google path this avoids re-running the billed Distance
+        # Matrix call for repeat searches within RANKED_STOPS_CACHE_TTL_SECONDS.
+        ranked_cache_key = get_ranked_stops_cache_key(origin, destination, place_query, live_lat, live_lng)
+        ranked_cached = ranked_stops_cache.get(ranked_cache_key)
+        if ranked_cached and (time.time() - ranked_cached.get("timestamp", 0) <= RANKED_STOPS_CACHE_TTL_SECONDS):
+            return jsonify({
+                "status": "success",
+                "search_query": place_query,
+                "on_route_stops_found": len(ranked_cached.get("stops", [])),
+                "stops": copy.deepcopy(ranked_cached.get("stops", [])),
+                "route_coordinates": route_coordinates,
+                "directions": direction_steps
+            })
 
         # Gather + filter candidates
         on_route_stops = []
@@ -856,7 +858,7 @@ def find_stops():
 
             on_route_stops = on_route_stops[:STOPS_RESPONSE_LIMIT]
 
-        if is_free_provider_enabled() and ranked_cache_key:
+        if ranked_cache_key:
             ranked_stops_cache[ranked_cache_key] = {
                 "timestamp": time.time(),
                 "stops": copy.deepcopy(on_route_stops),
