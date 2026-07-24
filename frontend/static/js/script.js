@@ -1,5 +1,5 @@
 import { buildApiUrl, fetchJson } from './modules/api.js';
-import { createMap, getCurrentTurnInfo, renderCurrentTurn, renderTurnStatus } from './modules/map.js';
+import { createMap, getCurrentTurnInfo, renderCurrentTurn, renderTurnStatus, escapeHtml } from './modules/map.js';
 import { renderConvoyMembersUI } from './modules/convoy.js';
 import { showToast } from './modules/toast.js';
 
@@ -283,11 +283,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.stops && data.stops.length > 0) {
                 data.stops.forEach(stop => {
                     const marker = L.marker([stop.location.lat, stop.location.lng]).addTo(markersLayer);
-                    marker.bindPopup(`<b>${stop.name}</b><br>Rating: ${stop.rating || 'N/A'}<br>${stop.distance} · ${stop.duration}`);
+                    marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>Rating: ${escapeHtml(stop.rating || 'N/A')}<br>${escapeHtml(stop.distance)} · ${escapeHtml(stop.duration)}`);
 
                     const li = document.createElement('li');
                     li.className = 'stop-item';
-                    li.innerHTML = `<span class="stop-item-name">${stop.name}</span><span class="stop-item-meta">⭐ ${stop.rating || 'N/A'} · ${stop.distance} · ${stop.duration}</span>`;
+                    li.innerHTML = `<span class="stop-item-name">${escapeHtml(stop.name)}</span><span class="stop-item-meta">⭐ ${escapeHtml(stop.rating || 'N/A')} · ${escapeHtml(stop.distance)} · ${escapeHtml(stop.duration)}</span>`;
                     li.addEventListener('click', () => {
                         map.flyTo([stop.location.lat, stop.location.lng], 16);
                         marker.openPopup();
