@@ -666,7 +666,7 @@ def find_stops():
             route_coordinates, direction_steps = get_mock_route_and_directions(origin, destination)
             mock_stops = [] if route_only else get_mock_stops(place_query)
 
-            if mock_stops and live_lat and live_lng:
+            if mock_stops and live_lat is not None and live_lng is not None:
                 current_route_index = get_closest_route_index(
                     {"lat": live_lat, "lng": live_lng},
                     route_coordinates,
@@ -804,7 +804,7 @@ def find_stops():
                 }
 
         current_route_index = None
-        if live_lat and live_lng and on_route_stops:
+        if live_lat is not None and live_lng is not None and on_route_stops:
             current_route_index = get_closest_route_index(
                 {"lat": live_lat, "lng": live_lng},
                 route_coordinates,
@@ -819,7 +819,7 @@ def find_stops():
         if on_route_stops:
             if is_free_provider_enabled():
                 on_route_stops = on_route_stops[:min(DISTANCE_MATRIX_MAX_DESTINATIONS, FREE_MAX_RANK_DESTINATIONS)]
-                if live_lat and live_lng:
+                if live_lat is not None and live_lng is not None:
                     ranking_origin = f"{live_lng},{live_lat}"
                 else:
                     origin_geo = geocode_with_nominatim(origin)
@@ -836,7 +836,7 @@ def find_stops():
                 # route with many on-route stops produces an over-limit request that
                 # fails and silently returns unranked stops.
                 on_route_stops = on_route_stops[:DISTANCE_MATRIX_MAX_DESTINATIONS]
-                ranking_origin = f"{live_lat},{live_lng}" if (live_lat and live_lng) else origin
+                ranking_origin = f"{live_lat},{live_lng}" if (live_lat is not None and live_lng is not None) else origin
                 destination_coords = "|".join([f"{stop['location']['lat']},{stop['location']['lng']}" for stop in on_route_stops])
                 matrix_params = { "origins": ranking_origin, "destinations": destination_coords, "key": API_KEY, "units": "metric" }
                 try:
