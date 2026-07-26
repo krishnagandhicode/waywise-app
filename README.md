@@ -1,9 +1,4 @@
 # WayWise AI - Real-Time Intelligent Navigation Assistant
-<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/cbab8ea5-ac10-4b8e-a6e7-ed18387f86ec" />
-
-## Live App
-
-https://www.waywiseapp.tech
 
 ## Introduction
 
