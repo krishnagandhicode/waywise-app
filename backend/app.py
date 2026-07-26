@@ -29,7 +29,22 @@ app = Flask(
     static_folder=str(STATIC_DIR),
     static_url_path="/static",
 )
-CORS(app)
+
+
+def parse_allowed_origins(raw_value):
+    """Parses WAYWISE_ALLOWED_ORIGINS into a list of origins."""
+    return [origin.strip() for origin in (raw_value or "").split(",") if origin.strip()]
+
+
+ALLOWED_ORIGINS = parse_allowed_origins(os.getenv("WAYWISE_ALLOWED_ORIGINS"))
+
+# Flask serves this project's own frontend, so the browser calls the API
+# same-origin and never needs CORS headers. CORS is therefore opt-in: without
+# WAYWISE_ALLOWED_ORIGINS no Access-Control-Allow-Origin is sent, so a page on
+# someone else's domain cannot read responses from a deployment and drive
+# billed Directions/Places/Distance Matrix traffic against its quota.
+if ALLOWED_ORIGINS:
+    CORS(app, origins=ALLOWED_ORIGINS)
 
 # API Configuration
 API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
