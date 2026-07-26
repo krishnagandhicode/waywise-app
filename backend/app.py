@@ -109,32 +109,32 @@ def get_provider_chain():
         return chain
     return ["google"]
 
+def find_stale_cache_keys(cache, ttl_seconds, current_time):
+    """Collects expired keys from a TTL cache without iterating it live.
+
+    list(cache.items()) is a single C-level call that cannot be interrupted by
+    another thread, whereas evaluating the staleness condition runs Python
+    bytecode and yields the GIL. Filtering the snapshot instead of the dict is
+    what keeps a concurrent request from raising "dictionary keys changed
+    during iteration" here.
+    """
+    return [
+        key
+        for key, value in list(cache.items())
+        if current_time - value.get("timestamp", 0) > ttl_seconds
+    ]
+
 def cleanup_stop_candidate_cache(now=None):
     current_time = now or time.time()
-    stale_keys = [
-        key
-        for key, value in stop_candidate_cache.items()
-        if current_time - value.get("timestamp", 0) > STOP_CACHE_TTL_SECONDS
-    ]
-    for key in stale_keys:
+    for key in find_stale_cache_keys(stop_candidate_cache, STOP_CACHE_TTL_SECONDS, current_time):
         stop_candidate_cache.pop(key, None)
 
-    stale_ranked_keys = [
-        key
-        for key, value in ranked_stops_cache.items()
-        if current_time - value.get("timestamp", 0) > RANKED_STOPS_CACHE_TTL_SECONDS
-    ]
-    for key in stale_ranked_keys:
+    for key in find_stale_cache_keys(ranked_stops_cache, RANKED_STOPS_CACHE_TTL_SECONDS, current_time):
         ranked_stops_cache.pop(key, None)
 
 def cleanup_geocode_cache(now=None):
     current_time = now or time.time()
-    stale_keys = [
-        key
-        for key, value in geocode_cache.items()
-        if current_time - value.get("timestamp", 0) > GEOCODE_CACHE_TTL_SECONDS
-    ]
-    for key in stale_keys:
+    for key in find_stale_cache_keys(geocode_cache, GEOCODE_CACHE_TTL_SECONDS, current_time):
         geocode_cache.pop(key, None)
 
 def get_stop_cache_key(origin, destination, place_query):
