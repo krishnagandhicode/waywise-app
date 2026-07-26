@@ -47,3 +47,25 @@ def test_chat_intents_still_route(client, message, expected_action):
     response = client.post("/chat", json={"message": message})
     assert response.status_code == 200
     assert response.get_json()["action"] == expected_action
+
+
+@pytest.mark.parametrize(
+    "message,expected_query",
+    [
+        ("find a pharmacy", "pharmacy"),
+        ("find a chemist nearby", "pharmacy"),
+        ("find medicine", "pharmacy"),
+        ("find petrol", "petrol pump"),
+        ("find fuel", "petrol pump"),
+        ("find an atm", "atm"),
+        ("find a bank", "atm"),
+        ("find a dhaba", "dhaba"),
+        ("find something to eat", "restaurant"),
+    ],
+)
+def test_chat_covers_every_quick_search_stop_type(client, message, expected_query):
+    """index.html offers Fuel / Food / Pharmacy / ATM. Pharmacy and ATM used to
+    fall through to the restaurant default, so chat could not reach them."""
+    response = client.post("/chat", json={"message": message})
+    assert response.status_code == 200
+    assert response.get_json()["data"]["query"] == expected_query

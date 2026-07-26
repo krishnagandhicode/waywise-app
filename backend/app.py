@@ -942,10 +942,17 @@ def chat():
     elif "find" in user_message or "near me" in user_message:
         response_text = "Searching for stops along your route..."
         action = "find_stops"
-        if "dhaba" in user_message:
-            action_data['query'] = "dhaba"
-        elif "petrol" in user_message:
+        # Keep these in step with the quick-search buttons in index.html
+        # (Fuel / Food / Pharmacy / ATM), otherwise a stop type reachable by tap
+        # is not reachable by chat.
+        if "pharmacy" in user_message or "chemist" in user_message or "medicine" in user_message:
+            action_data['query'] = "pharmacy"
+        elif "petrol" in user_message or "fuel" in user_message:
             action_data['query'] = "petrol pump"
+        elif "atm" in user_message or "bank" in user_message:
+            action_data['query'] = "atm"
+        elif "dhaba" in user_message:
+            action_data['query'] = "dhaba"
         else:
             action_data['query'] = "restaurant"
 
