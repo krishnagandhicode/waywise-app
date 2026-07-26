@@ -154,6 +154,19 @@ FREE_MAX_SEARCH_POINTS=8
 Note: Public free endpoints are rate-limited and shared. Use moderate request frequency and keep caps low during testing.
 If one Overpass endpoint is rate-limited, WayWise automatically tries fallback endpoints.
 
+### Cross-Origin Access (CORS)
+
+Flask serves this project's own frontend, so the browser calls the API on the same
+origin and no CORS headers are needed. By default WayWise therefore sends none, which
+stops a page on another domain from reading responses out of your deployment and
+running up your Google quota.
+
+If you do host the frontend separately, list the origins explicitly:
+
+```env
+WAYWISE_ALLOWED_ORIGINS=https://www.waywiseapp.tech,http://localhost:3000
+```
+
 ## Google Baseline Reference Page
 
 To explore a direct Google Maps JavaScript baseline (map init + route render + places search), open:
