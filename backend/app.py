@@ -793,6 +793,7 @@ def find_stops():
                 on_route_stops = copy.deepcopy(cached_stop_data.get("stops", []))
             else:
                 all_candidates = {}
+                any_successful_response = False
                 # Cap Places sample points (and spread them across the whole route) so
                 # billed call volume stays bounded regardless of route length. The free
                 # path caps via FREE_MAX_SEARCH_POINTS; mirror that for the Google path.
@@ -811,8 +812,14 @@ def find_stops():
                     places_data = places_response.json()
                     status = places_data.get("status")
                     if status == "OK":
+                        any_successful_response = True
                         for place in places_data.get("results", []):
                             all_candidates[place["place_id"]] = place
+                    elif status == "ZERO_RESULTS":
+                        # A definitive "nothing here", not a failure. Counts as a
+                        # real answer so genuinely empty areas still cache instead
+                        # of re-billing Places on every request.
+                        any_successful_response = True
                     elif status in {"REQUEST_DENIED", "OVER_DAILY_LIMIT", "OVER_QUERY_LIMIT", "INVALID_REQUEST"}:
                         raise ValueError(f"Google Places API returned status: {status}")
 
@@ -824,10 +831,17 @@ def find_stops():
                             "place_id": place.get("place_id"), "location": place_loc
                         })
 
-                stop_candidate_cache[stop_cache_key] = {
-                    "timestamp": time.time(),
-                    "stops": copy.deepcopy(on_route_stops),
-                }
+                # Avoid caching transient outage empties so retries can recover
+                # quickly, matching the free path above. Without this, one bad
+                # Places response pins an empty result for STOP_CACHE_TTL_SECONDS
+                # even after Google recovers.
+                if on_route_stops or any_successful_response:
+                    stop_candidate_cache[stop_cache_key] = {
+                        "timestamp": time.time(),
+                        "stops": copy.deepcopy(on_route_stops),
+                    }
+                else:
+                    provider_notice = "Stop search is temporarily unavailable. Please retry in a few seconds."
 
         current_route_index = None
         if live_lat is not None and live_lng is not None and on_route_stops:
