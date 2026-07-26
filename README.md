@@ -168,7 +168,11 @@ Set a browser-restricted API key in `.env`:
 GOOGLE_MAPS_JS_API_KEY="YOUR_BROWSER_KEY"
 ```
 
-If `GOOGLE_MAPS_JS_API_KEY` is not set, the page falls back to `GOOGLE_MAPS_API_KEY`.
+`GOOGLE_MAPS_JS_API_KEY` must be a separate, browser-restricted key. If it is not
+set, the key field on the page is simply left empty and you can paste a key in by
+hand — the page deliberately does **not** fall back to `GOOGLE_MAPS_API_KEY`, since
+that server-side key is unrestricted and would be readable by anyone who viewed the
+page source.
 
 ## Troubleshooting
 

@@ -604,8 +604,17 @@ def serve_index():
 
 @app.route('/google-baseline', methods=['GET'])
 def serve_google_baseline():
-    js_api_key = os.getenv("GOOGLE_MAPS_JS_API_KEY", API_KEY)
-    return render_template('google-baseline.html', google_maps_js_api_key=js_api_key)
+    # Deliberately does NOT fall back to API_KEY. That is the server-side key
+    # used for billed Directions/Places/Distance Matrix calls and it carries no
+    # HTTP-referrer restriction, so rendering it into this page would hand a
+    # spendable key to anyone who views source. Only a key explicitly marked as
+    # browser-safe gets prefilled; otherwise the field starts empty and one can
+    # be pasted in.
+    js_api_key = os.getenv("GOOGLE_MAPS_JS_API_KEY", "")
+    return render_template(
+        'google-baseline.html',
+        google_maps_js_api_key=js_api_key,
+    )
 
 @app.route('/script.js', methods=['GET'])
 def serve_script():
