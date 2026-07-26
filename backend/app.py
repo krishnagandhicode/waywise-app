@@ -333,6 +333,8 @@ def get_overpass_filter_for_query(place_query):
         return '["amenity"="atm"]'
     if "hospital" in q:
         return '["amenity"="hospital"]'
+    if "pharmacy" in q or "chemist" in q or "drugstore" in q or "medicine" in q:
+        return '["amenity"="pharmacy"]'
     if "hotel" in q:
         return '["tourism"="hotel"]'
     if "dhaba" in q or "restaurant" in q or "food" in q:
