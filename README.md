@@ -18,12 +18,14 @@ This project was born out of the common frustration of finding convenient stops 
 * **Intelligent On-Route Stop Finding:**
     * Finds potential stops (restaurants, petrol pumps, ATMs, custom queries) along the calculated route.
     * Uses the Haversine formula for geospatial filtering to identify stops requiring minimal deviation.
-    * Ranks suggested stops based on the shortest real-time detour duration calculated via the Google Distance Matrix API, using the user's live location as the origin.
-* **"Use My Location":** Allows users to instantly populate origin/destination fields with their current address using reverse geocoding (OpenStreetMap Nominatim).
+    * Ranks suggested stops by shortest real-time detour duration, using the user's live location as the origin. The ranking call depends on the active provider: OSRM Table on the default free stack, Google Distance Matrix on the Google stack.
+* **"Use GPS":** Allows users to instantly populate origin/destination fields with their current address using reverse geocoding (OpenStreetMap Nominatim).
 * **Interactive UI:** Responsive two-column layout built with HTML, CSS (Grid), and JavaScript, featuring map markers, route display, and dynamic results lists.
 * **Backend Health Indicator:** Frontend shows whether backend is reachable and which provider mode is active.
 * **Convoy Mode (MVP):** Create or join a room and share live locations among members during a trip.
-* **(Future Scope):** Integrated conversational AI assistant (using Gemini AI API) for contextual, on-the-go recommendations. ## Demo
+* **(Future Scope):** Integrated conversational AI assistant for contextual, on-the-go recommendations.
+
+## Demo
 
 
 
@@ -75,11 +77,11 @@ This project was born out of the common frustration of finding convenient stops 
 
 ## Usage
 
-1.  Enter your starting point (Origin) and destination. You can optionally click the "📍" button to use your current location.
+1.  Enter your starting point (Origin) and destination. You can optionally click the "Use GPS" button next to either field to fill it from your current location.
 2.  Click "Start Navigation".
 3.  Allow the browser to access your location when prompted.
 4.  The map will display the route, your live location (blue dot), and the current turn instruction at the top.
-5.  Use the buttons ("Petrol", "Restaurant", etc.) or the search bar under "Find on my way..." to find relevant stops.
+5.  Use the quick-search buttons ("Fuel", "Food", "Pharmacy", "ATM") or the search bar under "Find on my way..." to find relevant stops.
 6.  Results will be displayed as pins on the map and as a ranked list in the sidebar.
 
 ## Project Architecture
