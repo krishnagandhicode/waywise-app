@@ -81,6 +81,8 @@ MOCK_MODE = os.getenv("WAYWISE_MOCK_MODE", "false").lower() in ("1", "true", "ye
 ROUTE_CACHE_TTL_SECONDS = int(os.getenv("ROUTE_CACHE_TTL_SECONDS", "900"))
 DISTANCE_MATRIX_MAX_DESTINATIONS = int(os.getenv("DISTANCE_MATRIX_MAX_DESTINATIONS", "25"))
 BACKTRACK_PENALTY_SECONDS = int(os.getenv("BACKTRACK_PENALTY_SECONDS", "900"))
+MAX_LOCATION_INPUT_LENGTH = int(os.getenv("MAX_LOCATION_INPUT_LENGTH", "300"))
+MAX_QUERY_INPUT_LENGTH = int(os.getenv("MAX_QUERY_INPUT_LENGTH", "80"))
 ROUTE_ONLY_QUERIES = {"none", "route_only", "__route_only__"}
 
 route_cache = {}
@@ -682,6 +684,19 @@ def find_stops():
         return jsonify({"error": "Missing required parameters: origin, destination"}), 400
     if not route_only and not place_query:
         return jsonify({"error": "Missing required parameter: query"}), 400
+
+    # These strings become cache keys and are forwarded to Nominatim/OSRM/Google,
+    # so leaving them unbounded lets a caller grow the caches without limit and
+    # send oversized upstream requests. The limits are well clear of a real
+    # address; the GPS button fills these from a Nominatim display_name.
+    if len(origin) > MAX_LOCATION_INPUT_LENGTH or len(destination) > MAX_LOCATION_INPUT_LENGTH:
+        return jsonify({
+            "error": f"origin and destination must be {MAX_LOCATION_INPUT_LENGTH} characters or fewer"
+        }), 400
+    if len(place_query) > MAX_QUERY_INPUT_LENGTH:
+        return jsonify({
+            "error": f"query must be {MAX_QUERY_INPUT_LENGTH} characters or fewer"
+        }), 400
 
     try:
         live_lat, live_lng = parse_live_coordinates(live_lat_raw, live_lng_raw)
