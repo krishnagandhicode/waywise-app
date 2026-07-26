@@ -890,8 +890,17 @@ def find_stops():
 # --- NEW CHAT ENDPOINT ---
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.get_json()
-    user_message = data.get('message', '').lower()
+    # get_json() raises on a missing/!json content type and on malformed bodies,
+    # which surfaces as an HTML 415/400 instead of the JSON every other endpoint
+    # returns. silent=True gives us None for all of those so we can answer in JSON.
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
+
+    # A non-string message would blow up on .lower(); treat it as empty and fall
+    # through to the generic help reply, which is what an absent message does.
+    raw_message = body.get('message')
+    user_message = raw_message.lower() if isinstance(raw_message, str) else ''
 
     response_text = ""
     action = None
