@@ -44,6 +44,36 @@ def google_provider(monkeypatch):
         "get_decoded_route",
         lambda origin, destination: (ROUTE, STEPS, "google"),
     )
+    # Tests opt in to the free fallback explicitly; by default it is off and
+    # must never reach the real Overpass endpoints.
+    monkeypatch.setattr(backend_app_module, "GOOGLE_FALLBACK_ENABLED", False)
+
+    def no_overpass(*args, **kwargs):
+        raise AssertionError("unexpected Overpass call")
+
+    monkeypatch.setattr(backend_app_module, "find_places_with_overpass", no_overpass)
+
+
+OSM_PLACE = {
+    "node_1": {
+        "name": "OSM Pharmacy",
+        "rating": "N/A",
+        "place_id": "node_1",
+        "location": {"lat": 30.751, "lng": 76.801},
+    }
+}
+
+
+def enable_free_fallback(monkeypatch, candidates=OSM_PLACE, unavailable=False):
+    calls = []
+
+    def fake_overpass(route_coordinates, place_query):
+        calls.append(place_query)
+        return dict(candidates), unavailable
+
+    monkeypatch.setattr(backend_app_module, "GOOGLE_FALLBACK_ENABLED", True)
+    monkeypatch.setattr(backend_app_module, "find_places_with_overpass", fake_overpass)
+    return calls
 
 
 def answer_places_with(monkeypatch, places_response):
@@ -171,3 +201,87 @@ def test_places_far_from_the_route_are_dropped(client, google_provider, monkeypa
     response = search(client)
 
     assert [stop["place_id"] for stop in response.get_json()["stops"]] == ["abc123"]
+
+
+# --- free fallback ------------------------------------------------------------
+
+@pytest.mark.parametrize("status_code", [403, 429, 503])
+def test_places_failure_falls_back_to_openstreetmap(client, google_provider, monkeypatch, status_code):
+    """A rejected key, an exhausted daily quota or an outage must still leave
+    the user with stops when the free fallback is enabled."""
+    overpass_calls = enable_free_fallback(monkeypatch)
+    answer_places_with(monkeypatch, FakeResponse({"error": {}}, status_code))
+
+    response = search(client)
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert [stop["name"] for stop in payload["stops"]] == ["OSM Pharmacy"]
+    assert "OpenStreetMap" in payload["provider_notice"]
+    assert overpass_calls == ["pharmacy"]
+
+
+def test_fallback_results_are_not_cached(client, google_provider, monkeypatch):
+    """The next search should try Google again rather than serve OSM results
+    for STOP_CACHE_TTL_SECONDS."""
+    enable_free_fallback(monkeypatch)
+    answer_places_with(monkeypatch, FakeResponse({"error": {}}, 429))
+
+    search(client)
+
+    assert backend_app_module.stop_candidate_cache == {}
+
+
+def test_empty_fallback_reports_a_retryable_notice(client, google_provider, monkeypatch):
+    enable_free_fallback(monkeypatch, candidates={}, unavailable=True)
+    answer_places_with(monkeypatch, FakeResponse({"error": {}}, 503))
+
+    response = search(client)
+
+    assert response.status_code == 200
+    assert response.get_json()["stops"] == []
+    assert "retry" in response.get_json()["provider_notice"].lower()
+
+
+def test_successful_google_search_does_not_touch_overpass(client, google_provider, monkeypatch):
+    overpass_calls = enable_free_fallback(monkeypatch)
+    answer_places_with(monkeypatch, FakeResponse({}))
+
+    search(client)
+
+    assert overpass_calls == []
+
+
+def test_places_calls_run_concurrently(client, google_provider, monkeypatch):
+    """Sample points are independent, so total latency should be about one
+    call, not the sum of all of them."""
+    import threading
+    import time as time_module
+
+    long_route = [(30.70 + i * 0.001, 76.70 + i * 0.001) for i in range(400)]
+    monkeypatch.setattr(
+        backend_app_module, "get_decoded_route", lambda o, d: (long_route, STEPS, "google")
+    )
+    monkeypatch.setattr(backend_app_module, "GOOGLE_MAX_SEARCH_POINTS", 4)
+    monkeypatch.setattr(backend_app_module, "GOOGLE_PLACES_MAX_PARALLEL", 4)
+    state = {"active": 0, "peak": 0}
+    lock = threading.Lock()
+
+    def slow_post(url, *args, **kwargs):
+        with lock:
+            state["active"] += 1
+            state["peak"] = max(state["peak"], state["active"])
+        time_module.sleep(0.2)
+        with lock:
+            state["active"] -= 1
+        return FakeResponse({})
+
+    monkeypatch.setattr(backend_app_module.requests, "post", slow_post)
+
+    started = time_module.perf_counter()
+    response = search(client)
+    elapsed = time_module.perf_counter() - started
+
+    assert response.status_code == 200
+    assert state["peak"] == 4
+    assert elapsed < 0.6
