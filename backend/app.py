@@ -785,7 +785,16 @@ def get_closest_route_index(place_location, route_coordinates):
 
 @app.route('/', methods=['GET'])
 def serve_index():
-    return render_template('index.html')
+    # Google's terms require Google route and place results to be shown on a
+    # Google map, so the google provider renders with the Maps JavaScript API
+    # instead of Leaflet. Only the browser-restricted key is handed to the
+    # page, never API_KEY (see serve_google_baseline).
+    return render_template(
+        'index.html',
+        map_renderer="google" if is_google_provider_enabled() else "leaflet",
+        google_maps_js_api_key=os.getenv("GOOGLE_MAPS_JS_API_KEY", ""),
+        google_maps_map_id=os.getenv("GOOGLE_MAPS_MAP_ID", "DEMO_MAP_ID"),
+    )
 
 @app.route('/google-baseline', methods=['GET'])
 def serve_google_baseline():
