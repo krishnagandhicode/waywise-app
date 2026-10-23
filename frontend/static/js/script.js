@@ -277,14 +277,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             if (data.stops && data.stops.length > 0) {
                 data.stops.forEach(stop => {
+                    // Shared by the list item and the map popup. Unranked stops
+                    // have no distance or duration, so only the parts present.
+                    const stopMeta = [`⭐ ${stop.rating || 'N/A'}`, stop.distance, stop.duration]
+                        .filter(Boolean)
+                        .join(' · ');
                     const marker = mapView.addStopMarker(
                         [stop.location.lat, stop.location.lng],
-                        `<b>${escapeHtml(stop.name)}</b><br>Rating: ${escapeHtml(stop.rating || 'N/A')}<br>${escapeHtml(stop.distance)} · ${escapeHtml(stop.duration)}`,
+                        { title: stop.name, meta: stopMeta },
                     );
 
                     const li = document.createElement('li');
                     li.className = 'stop-item';
-                    li.innerHTML = `<span class="stop-item-name">${escapeHtml(stop.name)}</span><span class="stop-item-meta">⭐ ${escapeHtml(stop.rating || 'N/A')} · ${escapeHtml(stop.distance)} · ${escapeHtml(stop.duration)}</span>`;
+                    li.innerHTML = `<span class="stop-item-name">${escapeHtml(stop.name)}</span><span class="stop-item-meta">${escapeHtml(stopMeta)}</span>`;
                     li.addEventListener('click', () => {
                         mapView.flyTo([stop.location.lat, stop.location.lng], 16);
                         marker.openPopup();

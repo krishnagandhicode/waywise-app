@@ -35,6 +35,7 @@
     --dark-btn: #0f172a;
     --hud-bg: rgba(255, 255, 255, 0.9);
     --popup-bg: #ffffff;
+    --popup-tail-shadow: rgba(6, 37, 98, 0.18);
     --hud-border: rgba(7, 61, 153, 0.16);
     --hud-shadow: 0 15px 28px rgba(6, 37, 98, 0.2);
     --hud-instruction: #0c2d70;
@@ -85,6 +86,7 @@
     --dark-btn: #2563eb;
     --hud-bg: rgba(18, 27, 46, 0.92);
     --popup-bg: #162035;
+    --popup-tail-shadow: rgba(0, 0, 0, 0.45);
     --hud-border: rgba(96, 165, 250, 0.22);
     --hud-shadow: 0 18px 34px rgba(0, 0, 0, 0.5);
     --hud-instruction: #dce7fb;
@@ -1205,13 +1207,64 @@ button {
     color: var(--muted);
 }
 
-/* Google info windows have a fixed white bubble but no text colour of their
-   own, so in the dark theme they inherited the light page text and became
-   unreadable. Give the bubble, its tail and its close button theme colours. */
-#map .gm-style .gm-style-iw-c {
+/* Map popups: a name and a details line, styled like the stop list cards and
+   framed like the turn panel, the same on both map renderers. */
+.map-popup-title {
+    font-family: "Sora", sans-serif;
+    font-weight: 700;
+    font-size: 0.88rem;
+    line-height: 1.3;
+    color: var(--list-name);
+}
+
+.map-popup-meta {
+    font-family: "Sora", sans-serif;
+    font-weight: 400;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--muted);
+}
+
+.map-popup .map-popup-meta {
+    margin-top: 3px;
+}
+
+/* Leaflet (free provider) */
+#map .leaflet-popup-content-wrapper,
+#map .leaflet-popup-tip {
     background: var(--popup-bg);
     color: var(--text);
     box-shadow: var(--hud-shadow);
+}
+
+#map .leaflet-popup-content-wrapper {
+    border: 1px solid var(--hud-border);
+    border-radius: 14px;
+}
+
+#map .leaflet-popup-content {
+    margin: 12px 32px 12px 14px;
+}
+
+#map a.leaflet-popup-close-button {
+    color: var(--muted);
+}
+
+/* Google (google provider). The bubble is white with no text colour of its
+   own, so without these it inherits the page's light dark-theme text. */
+#map .gm-style .gm-style-iw-c {
+    background: var(--popup-bg);
+    color: var(--text);
+    border: 1px solid var(--hud-border);
+    border-radius: 14px;
+    box-shadow: var(--hud-shadow);
+    padding-left: 14px;
+}
+
+/* Google gives the tail a light grey drop shadow meant for its white bubble,
+   which shows as a pale outline under a dark one. */
+#map .gm-style .gm-style-iw-tc {
+    filter: drop-shadow(0 4px 3px var(--popup-tail-shadow));
 }
 
 #map .gm-style .gm-style-iw-tc::after,
@@ -1220,9 +1273,18 @@ button {
     background: var(--popup-bg);
 }
 
+/* The header row holds the title beside the 48px close button. */
+#map .gm-style .gm-style-iw-ch {
+    padding-top: 15px;
+}
+
 /* Google always reserves scrollbars, which show as strips in the dark theme. */
 #map .gm-style .gm-style-iw-d {
     overflow: auto !important;
+}
+
+#map .gm-style .gm-style-iw-d .map-popup-meta {
+    padding: 0 14px 12px 0;
 }
 
 #map .gm-style .gm-style-iw-c button.gm-ui-hover-effect > span {

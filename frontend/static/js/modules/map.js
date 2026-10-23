@@ -7,6 +7,33 @@ export const HEADING_ARROW_HTML = '<svg viewBox="0 0 24 24" xmlns="http://www.w3
 const POSITION_DOT_STYLE = { radius: 8, color: '#1d4ed8', fillColor: '#3498db', fillOpacity: 1, weight: 2 };
 const ROUTE_STYLE = { color: '#007bff', weight: 5 };
 
+// Popups are described as plain text, { title, meta }, and each renderer
+// builds the elements itself. Text goes in through textContent, so place and
+// member names never need escaping here.
+export const POSITION_POPUP = { title: 'You are here' };
+
+export function createPopupTitle(popup) {
+    const title = document.createElement('div');
+    title.className = 'map-popup-title';
+    title.textContent = popup.title;
+    return title;
+}
+
+export function createPopupMeta(popup) {
+    const meta = document.createElement('div');
+    meta.className = 'map-popup-meta';
+    meta.textContent = popup.meta || '';
+    return meta;
+}
+
+function createPopupContent(popup) {
+    const content = document.createElement('div');
+    content.className = 'map-popup';
+    content.appendChild(createPopupTitle(popup));
+    if (popup.meta) content.appendChild(createPopupMeta(popup));
+    return content;
+}
+
 export function convoyMarkerStyle(isMe) {
     return {
         radius: isMe ? 10 : 8,
@@ -67,9 +94,9 @@ export function createMap({ mapId, initialCenter, zoom }) {
             routeLayer = null;
         },
 
-        addStopMarker(latLng, popupHtml) {
+        addStopMarker(latLng, popup) {
             const marker = L.marker(latLng).addTo(stopsLayer);
-            marker.bindPopup(popupHtml);
+            marker.bindPopup(createPopupContent(popup));
             return { openPopup: () => marker.openPopup() };
         },
         clearStopMarkers() {
@@ -88,7 +115,7 @@ export function createMap({ mapId, initialCenter, zoom }) {
                 if (!positionMarker || !positionMarkerIsArrow) {
                     if (positionMarker) map.removeLayer(positionMarker);
                     positionMarker = L.marker(latLng, { icon: createHeadingArrowIcon(heading), zIndexOffset: 1000 }).addTo(map);
-                    positionMarker.bindPopup('<b>You are here</b>');
+                    positionMarker.bindPopup(createPopupContent(POSITION_POPUP));
                     positionMarkerIsArrow = true;
                 } else {
                     positionMarker.setLatLng(latLng);
@@ -100,7 +127,7 @@ export function createMap({ mapId, initialCenter, zoom }) {
 
             if (!positionMarker) {
                 positionMarker = L.circleMarker(latLng, POSITION_DOT_STYLE).addTo(map);
-                positionMarker.bindPopup('<b>You are here</b>').openPopup();
+                positionMarker.bindPopup(createPopupContent(POSITION_POPUP)).openPopup();
                 positionMarkerIsArrow = false;
             } else {
                 // No fresh heading: just move whatever marker we already have (dot or last arrow).
@@ -113,8 +140,8 @@ export function createMap({ mapId, initialCenter, zoom }) {
             positionMarkerIsArrow = false;
         },
 
-        // label and popupHtml must already be escaped.
-        upsertConvoyMarker(memberId, latLng, { isMe, label, popupHtml }) {
+        // label must already be escaped (the tooltip takes HTML); popup is plain text.
+        upsertConvoyMarker(memberId, latLng, { isMe, label, popup }) {
             let marker = convoyMarkers.get(memberId);
             if (!marker) {
                 marker = L.circleMarker(latLng, convoyMarkerStyle(isMe)).addTo(convoyLayer);
@@ -123,7 +150,7 @@ export function createMap({ mapId, initialCenter, zoom }) {
                 marker.setLatLng(latLng);
                 marker.setStyle(convoyMarkerStyle(isMe));
             }
-            marker.bindPopup(popupHtml);
+            marker.bindPopup(createPopupContent(popup));
             marker.bindTooltip(label, {
                 permanent: true,
                 direction: 'top',

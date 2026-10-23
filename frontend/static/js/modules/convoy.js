@@ -40,7 +40,7 @@ export function renderConvoyMembersUI({
             mapView.upsertConvoyMarker(member.member_id, markerLatLng, {
                 isMe,
                 label: safeLabel,
-                popupHtml: `<b>${safeLabel}</b><br>${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`,
+                popup: { title: label, meta: `${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}` },
             });
             activeMemberIds.add(member.member_id);
         }
