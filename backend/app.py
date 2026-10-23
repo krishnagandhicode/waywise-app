@@ -71,6 +71,11 @@ ROUTE_MATRIX_FIELD_MASK = "originIndex,destinationIndex,status,condition,distanc
 MAP_PROVIDER = os.getenv("WAYWISE_MAP_PROVIDER", "free").strip().lower()
 GOOGLE_FALLBACK_ENABLED = os.getenv("WAYWISE_ENABLE_GOOGLE_FALLBACK", "true").lower() in ("1", "true", "yes", "on")
 NOMINATIM_SEARCH_URL = os.getenv("NOMINATIM_SEARCH_URL", "https://nominatim.openstreetmap.org/search")
+# Second free geocoder over the same OpenStreetMap data. Nominatim rate-limits
+# by IP, and hosting platforms share outbound IPs between many apps, so a
+# deployment can be refused even when it sends very little itself.
+PHOTON_SEARCH_URL = os.getenv("PHOTON_SEARCH_URL", "https://photon.komoot.io/api/")
+NOMINATIM_BACKOFF_SECONDS = int(os.getenv("NOMINATIM_BACKOFF_SECONDS", "300"))
 OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "https://router.project-osrm.org")
 OVERPASS_API_URL = os.getenv("OVERPASS_API_URL", "https://overpass-api.de/api/interpreter")
 OVERPASS_API_URLS = [
@@ -111,7 +116,8 @@ stop_candidate_cache = {}
 ranked_stops_cache = {}
 geocode_cache = {}
 OVERPASS_PREFERRED_INDEX = 0
-HTTP_HEADERS = {"User-Agent": "WayWise/1.0 (educational testing)"}
+HTTP_HEADERS = {"User-Agent": "WayWise/1.0 (+https://www.waywiseapp.tech)"}
+nominatim_blocked_until = 0.0
 CONVOY_MEMBER_TTL_SECONDS = int(os.getenv("CONVOY_MEMBER_TTL_SECONDS", "300"))
 CONVOY_ROOM_TTL_SECONDS = int(os.getenv("CONVOY_ROOM_TTL_SECONDS", "86400"))
 convoy_rooms = {}
@@ -296,7 +302,42 @@ def format_distance(meters):
         return f"{int(round(meters))} m"
     return f"{meters / 1000:.1f} km"
 
-def geocode_with_nominatim(location_text):
+def search_nominatim(location_text):
+    response = requests.get(
+        NOMINATIM_SEARCH_URL,
+        params={"q": location_text, "format": "jsonv2", "limit": 1},
+        headers=HTTP_HEADERS,
+        timeout=10,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if not data:
+        return None
+    return {"lat": float(data[0]["lat"]), "lng": float(data[0]["lon"])}
+
+def search_photon(location_text):
+    response = requests.get(
+        PHOTON_SEARCH_URL,
+        params={"q": location_text, "limit": 1},
+        headers=HTTP_HEADERS,
+        timeout=10,
+    )
+    response.raise_for_status()
+    features = response.json().get("features") or []
+    if not features:
+        return None
+    lng, lat = features[0]["geometry"]["coordinates"][:2]
+    return {"lat": float(lat), "lng": float(lng)}
+
+def geocode_location(location_text):
+    """Resolves place text to {"lat", "lng"} with Nominatim, falling back to Photon.
+
+    Photon is tried when Nominatim fails or finds nothing. After Nominatim
+    answers 429 it is skipped for NOMINATIM_BACKOFF_SECONDS rather than asked
+    again on every request. Raises only if both services fail.
+    """
+    global nominatim_blocked_until
+
     normalized = (location_text or "").strip().lower()
     if not normalized:
         return None
@@ -305,26 +346,27 @@ def geocode_with_nominatim(location_text):
     if cached and (time.time() - cached["timestamp"] <= GEOCODE_CACHE_TTL_SECONDS):
         return dict(cached["value"])
 
-    params = {
-        "q": location_text,
-        "format": "jsonv2",
-        "limit": 1,
-    }
-    response = requests.get(
-        NOMINATIM_SEARCH_URL,
-        params=params,
-        headers=HTTP_HEADERS,
-        timeout=10,
-    )
-    response.raise_for_status()
-    data = response.json()
-    if not data:
-        return None
+    result = None
+    nominatim_error = None
+    if time.time() >= nominatim_blocked_until:
+        try:
+            result = search_nominatim(location_text)
+        except (requests.exceptions.RequestException, ValueError, KeyError) as exc:
+            nominatim_error = exc
+            response = getattr(exc, "response", None)
+            if response is not None and response.status_code == 429:
+                nominatim_blocked_until = time.time() + NOMINATIM_BACKOFF_SECONDS
 
-    result = {
-        "lat": float(data[0]["lat"]),
-        "lng": float(data[0]["lon"]),
-    }
+    if result is None:
+        try:
+            result = search_photon(location_text)
+        except (requests.exceptions.RequestException, ValueError, KeyError, IndexError, TypeError):
+            if nominatim_error is not None:
+                raise nominatim_error
+            raise
+
+    if result is None:
+        return None
     geocode_cache[normalized] = {
         "timestamp": time.time(),
         "value": result,
@@ -376,8 +418,8 @@ def get_route_with_google(origin, destination):
     return decoded_coordinates, direction_steps
 
 def get_route_with_osrm(origin, destination):
-    origin_geo = geocode_with_nominatim(origin)
-    destination_geo = geocode_with_nominatim(destination)
+    origin_geo = geocode_location(origin)
+    destination_geo = geocode_location(destination)
     if not origin_geo or not destination_geo:
         return None, None
 
@@ -1089,7 +1131,7 @@ def find_stops():
                 if live_lat is not None and live_lng is not None:
                     ranking_origin = f"{live_lng},{live_lat}"
                 else:
-                    origin_geo = geocode_with_nominatim(origin)
+                    origin_geo = geocode_location(origin)
                     if not origin_geo:
                         raise ValueError("Could not geocode origin for ranking")
                     ranking_origin = f"{origin_geo['lng']},{origin_geo['lat']}"
