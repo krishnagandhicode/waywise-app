@@ -8,7 +8,9 @@ long the detour actually takes and whether the stop is still ahead of you.
 
 **Live app:** https://www.waywiseapp.tech
 
-![WayWise in Google mode: fuel stops along the route near Mohali, ranked by detour time](docs/images/waywise-google-dark.png)
+**Demo video (Google Maps Platform version):** https://youtu.be/StoE0CNFRbw
+
+[![WayWise in Google mode: fuel stops along the route near Mohali, ranked by detour time. Click to watch the demo video.](docs/images/waywise-google-dark.png)](https://youtu.be/StoE0CNFRbw)
 
 ## Features
 
