@@ -34,6 +34,7 @@
     --list-name: #0c2d70;
     --dark-btn: #0f172a;
     --hud-bg: rgba(255, 255, 255, 0.9);
+    --popup-bg: #ffffff;
     --hud-border: rgba(7, 61, 153, 0.16);
     --hud-shadow: 0 15px 28px rgba(6, 37, 98, 0.2);
     --hud-instruction: #0c2d70;
@@ -83,6 +84,7 @@
     --list-name: #aac6f7;
     --dark-btn: #2563eb;
     --hud-bg: rgba(18, 27, 46, 0.92);
+    --popup-bg: #162035;
     --hud-border: rgba(96, 165, 250, 0.22);
     --hud-shadow: 0 18px 34px rgba(0, 0, 0, 0.5);
     --hud-instruction: #dce7fb;
@@ -1201,4 +1203,28 @@ button {
     padding: 24px;
     text-align: center;
     color: var(--muted);
+}
+
+/* Google info windows have a fixed white bubble but no text colour of their
+   own, so in the dark theme they inherited the light page text and became
+   unreadable. Give the bubble, its tail and its close button theme colours. */
+#map .gm-style .gm-style-iw-c {
+    background: var(--popup-bg);
+    color: var(--text);
+    box-shadow: var(--hud-shadow);
+}
+
+#map .gm-style .gm-style-iw-tc::after,
+#map .gm-style .gm-style-iw-d::-webkit-scrollbar-track,
+#map .gm-style .gm-style-iw-d::-webkit-scrollbar-track-piece {
+    background: var(--popup-bg);
+}
+
+/* Google always reserves scrollbars, which show as strips in the dark theme. */
+#map .gm-style .gm-style-iw-d {
+    overflow: auto !important;
+}
+
+#map .gm-style .gm-style-iw-c button.gm-ui-hover-effect > span {
+    background-color: var(--muted) !important;
 }
