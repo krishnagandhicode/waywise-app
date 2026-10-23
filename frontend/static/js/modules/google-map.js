@@ -1,7 +1,9 @@
 // Google Maps renderer for the map view interface defined in map.js. Used when
 // the backend runs on the google provider, because Google route and place
 // results may only be displayed on a Google map.
-import { HEADING_ARROW_HTML, convoyMarkerStyle } from './map.js';
+import {
+    HEADING_ARROW_HTML, POSITION_POPUP, convoyMarkerStyle, createPopupMeta, createPopupTitle,
+} from './map.js';
 
 const ROUTE_STYLE = { strokeColor: '#007bff', strokeOpacity: 1, strokeWeight: 5 };
 const POSITION_DOT_STYLE = { radius: 8, color: '#1d4ed8', fillColor: '#3498db' };
@@ -95,31 +97,34 @@ export async function createGoogleMap({ mapId, initialCenter, zoom, apiKey, goog
         colorScheme: document.documentElement.getAttribute('data-theme') === 'dark' ? 'DARK' : 'LIGHT',
     });
 
-    // One shared window, so opening a popup closes the previous one as Leaflet does.
-    const infoWindow = new InfoWindow();
+    // One shared window, so opening a popup closes the previous one as Leaflet
+    // does. The title goes in the header row beside the close button, which
+    // otherwise stays as an empty strip above the content.
+    const infoWindow = new InfoWindow({ maxWidth: 280 });
     const stopMarkers = [];
     const convoyMarkers = new Map();
     let routeLine = null;
     let positionMarker = null;
     let positionMarkerIsArrow = false;
 
-    function addMarker(latLng, content, popupHtml, zIndex) {
+    function addMarker(latLng, content, popup, zIndex) {
         const marker = new AdvancedMarkerElement({
             map,
             position: toLatLng(latLng),
             content,
             zIndex,
-            gmpClickable: Boolean(popupHtml),
+            gmpClickable: Boolean(popup),
         });
-        marker.popupHtml = popupHtml;
-        if (popupHtml) {
+        marker.popup = popup;
+        if (popup) {
             marker.addEventListener('gmp-click', () => openPopup(marker));
         }
         return marker;
     }
 
     function openPopup(marker) {
-        infoWindow.setContent(marker.popupHtml);
+        infoWindow.setHeaderContent(createPopupTitle(marker.popup));
+        infoWindow.setContent(createPopupMeta(marker.popup));
         infoWindow.open({ anchor: marker, map });
     }
 
@@ -156,8 +161,8 @@ export async function createGoogleMap({ mapId, initialCenter, zoom, apiKey, goog
             routeLine = null;
         },
 
-        addStopMarker(latLng, popupHtml) {
-            const marker = addMarker(latLng, undefined, popupHtml);
+        addStopMarker(latLng, popup) {
+            const marker = addMarker(latLng, undefined, popup);
             stopMarkers.push(marker);
             return { openPopup: () => openPopup(marker) };
         },
@@ -175,7 +180,7 @@ export async function createGoogleMap({ mapId, initialCenter, zoom, apiKey, goog
             if (hasHeading) {
                 if (!positionMarker || !positionMarkerIsArrow) {
                     if (positionMarker) removeMarker(positionMarker);
-                    positionMarker = addMarker(latLng, arrowElement(heading), '<b>You are here</b>', 1000);
+                    positionMarker = addMarker(latLng, arrowElement(heading), POSITION_POPUP, 1000);
                     positionMarkerIsArrow = true;
                 } else {
                     positionMarker.position = toLatLng(latLng);
@@ -188,7 +193,7 @@ export async function createGoogleMap({ mapId, initialCenter, zoom, apiKey, goog
             if (!positionMarker) {
                 const dot = circleElement(POSITION_DOT_STYLE);
                 dot.classList.add('gmap-centered');
-                positionMarker = addMarker(latLng, dot, '<b>You are here</b>', 1000);
+                positionMarker = addMarker(latLng, dot, POSITION_POPUP, 1000);
                 positionMarkerIsArrow = false;
                 openPopup(positionMarker);
             } else {
@@ -201,16 +206,16 @@ export async function createGoogleMap({ mapId, initialCenter, zoom, apiKey, goog
             positionMarkerIsArrow = false;
         },
 
-        // label and popupHtml must already be escaped.
-        upsertConvoyMarker(memberId, latLng, { isMe, label, popupHtml }) {
+        // label must already be escaped (it is set as HTML); popup is plain text.
+        upsertConvoyMarker(memberId, latLng, { isMe, label, popup }) {
             let marker = convoyMarkers.get(memberId);
             if (!marker) {
-                marker = addMarker(latLng, convoyElement(isMe, label), popupHtml, 900);
+                marker = addMarker(latLng, convoyElement(isMe, label), popup, 900);
                 convoyMarkers.set(memberId, marker);
             } else {
                 marker.position = toLatLng(latLng);
                 marker.content = convoyElement(isMe, label);
-                marker.popupHtml = popupHtml;
+                marker.popup = popup;
             }
         },
         removeConvoyMarkersExcept(activeMemberIds) {
