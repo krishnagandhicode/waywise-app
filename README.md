@@ -29,11 +29,9 @@ This project was born out of the common frustration of finding convenient stops 
 * **Backend:** Python, Flask, Flask-CORS
 * **Frontend:** JavaScript, HTML5, CSS3 (Grid Layout), Leaflet.js
 * **APIs:**
-    * Google Maps Platform (Directions, Places, Distance Matrix)
-    * Free map stack for testing (OSRM + OpenStreetMap Nominatim + Overpass)
+    * Open map stack, used by default and in production (OSRM routing + OpenStreetMap Nominatim geocoding + Overpass POI search)
+    * Google Maps Platform (Directions, Places, Distance Matrix) - optional alternate provider, off unless `WAYWISE_MAP_PROVIDER=google`
     * Browser Geolocation API (getCurrentPosition, watchPosition)
-    * OpenStreetMap Nominatim (Reverse Geocoding)
-    * [Optional: Gemini AI API - if implementing chatbot]
 * **Environment:** Git, GitHub, Virtualenv
 
 ## Setup and Installation
