@@ -52,7 +52,9 @@ ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 # for decide the billing SKU, so request exactly what get_route_with_google reads.
 ROUTES_FIELD_MASK = "routes.polyline.encodedPolyline,routes.legs.steps.navigationInstruction"
 PLACES_API_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-DISTANCE_MATRIX_API_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
+ROUTE_MATRIX_API_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
+# status must be in the mask: without it every element reads as OK.
+ROUTE_MATRIX_FIELD_MASK = "originIndex,destinationIndex,status,condition,distanceMeters,duration"
 MAP_PROVIDER = os.getenv("WAYWISE_MAP_PROVIDER", "free").strip().lower()
 GOOGLE_FALLBACK_ENABLED = os.getenv("WAYWISE_ENABLE_GOOGLE_FALLBACK", "true").lower() in ("1", "true", "yes", "on")
 NOMINATIM_SEARCH_URL = os.getenv("NOMINATIM_SEARCH_URL", "https://nominatim.openstreetmap.org/search")
@@ -522,6 +524,60 @@ def rank_stops_with_fallback(stops, ranking_origin):
     stops.sort(key=lambda x: x.get('score_seconds', x.get('duration_seconds', 99999)))
     return stops
 
+def parse_google_duration_seconds(value):
+    """Routes API durations are strings such as "1234s" or "3.5s"."""
+    try:
+        return int(float(str(value).rstrip("s")))
+    except (TypeError, ValueError):
+        return None
+
+def rank_stops_with_google_matrix(stops, ranking_origin):
+    """Ranks stops by drive time using Routes API computeRouteMatrix.
+
+    ranking_origin is a (lat, lng) tuple for a live position, or the origin
+    text when there is no fix yet.
+    """
+    if not stops:
+        return stops
+
+    if isinstance(ranking_origin, tuple):
+        origin_waypoint = {"location": {"latLng": {"latitude": ranking_origin[0], "longitude": ranking_origin[1]}}}
+    else:
+        origin_waypoint = {"address": ranking_origin}
+    body = {
+        "origins": [{"waypoint": origin_waypoint}],
+        "destinations": [
+            {"waypoint": {"location": {"latLng": {"latitude": stop['location']['lat'], "longitude": stop['location']['lng']}}}}
+            for stop in stops
+        ],
+        "travelMode": "DRIVE",
+    }
+    elements = post_to_google(ROUTE_MATRIX_API_URL, body, ROUTE_MATRIX_FIELD_MASK)
+    if not isinstance(elements, list):
+        raise ValueError("Google Routes API returned an unexpected matrix response")
+
+    # Elements arrive in no particular order, so match them back to stops by
+    # destinationIndex. Zero-valued fields are left out of the JSON, which means
+    # the first destination's element has no destinationIndex at all.
+    for element in elements:
+        index = element.get("destinationIndex", 0)
+        if not 0 <= index < len(stops):
+            continue
+        if element.get("status", {}).get("code", 0) != 0 or element.get("condition") != "ROUTE_EXISTS":
+            continue
+        duration_seconds = parse_google_duration_seconds(element.get("duration"))
+        if duration_seconds is None:
+            continue
+        stop = stops[index]
+        stop['duration_seconds'] = duration_seconds
+        stop['duration'] = format_duration(duration_seconds)
+        stop['distance'] = format_distance(element.get("distanceMeters", 0))
+
+    for stop in stops:
+        stop['score_seconds'] = stop.get('duration_seconds', 99999) + stop.get('backtrack_penalty_seconds', 0)
+    stops.sort(key=lambda x: x['score_seconds'])
+    return stops
+
 def get_decoded_route(origin, destination):
     """Fetches and decodes the route, and also extracts direction steps."""
     last_exception = None
@@ -912,30 +968,21 @@ def find_stops():
                 except requests.exceptions.RequestException:
                     on_route_stops = rank_stops_with_fallback(on_route_stops, ranking_origin)
             else:
-                # Google Distance Matrix caps destinations per request, so trim the
-                # candidate list before building the matrix call. Without this, a long
-                # route with many on-route stops produces an over-limit request that
-                # fails and silently returns unranked stops.
+                # Each matrix element is billed, so cap the destinations before
+                # building the request rather than ranking every on-route stop.
                 on_route_stops = on_route_stops[:DISTANCE_MATRIX_MAX_DESTINATIONS]
-                ranking_origin = f"{live_lat},{live_lng}" if (live_lat is not None and live_lng is not None) else origin
-                destination_coords = "|".join([f"{stop['location']['lat']},{stop['location']['lng']}" for stop in on_route_stops])
-                matrix_params = { "origins": ranking_origin, "destinations": destination_coords, "key": API_KEY, "units": "metric" }
+                if live_lat is not None and live_lng is not None:
+                    ranking_origin = (live_lat, live_lng)
+                    fallback_origin = f"{live_lng},{live_lat}"
+                else:
+                    ranking_origin = origin
+                    fallback_origin = None
                 try:
-                    matrix_response = requests.get(DISTANCE_MATRIX_API_URL, params=matrix_params, timeout=15)
-                    matrix_data = matrix_response.json()
-
-                    if matrix_data['status'] == 'OK' and matrix_data['rows'][0]['elements']:
-                        for i, stop in enumerate(on_route_stops):
-                            element = matrix_data['rows'][0]['elements'][i]
-                            if element['status'] == 'OK':
-                                stop['distance'] = element['distance']['text']
-                                stop['duration'] = element['duration']['text']
-                                stop['duration_seconds'] = element['duration']['value']
-                            stop['score_seconds'] = stop.get('duration_seconds', 99999) + stop.get('backtrack_penalty_seconds', 0)
-
-                        on_route_stops.sort(key=lambda x: x.get('score_seconds', x.get('duration_seconds', 99999)))
-                except requests.exceptions.RequestException:
-                    pass
+                    on_route_stops = rank_stops_with_google_matrix(on_route_stops, ranking_origin)
+                except (requests.exceptions.RequestException, ValueError):
+                    # A ranking failure should not cost the user their stops, so
+                    # fall back to straight-line ETAs like the free path does.
+                    on_route_stops = rank_stops_with_fallback(on_route_stops, fallback_origin)
 
             on_route_stops = on_route_stops[:STOPS_RESPONSE_LIMIT]
 
