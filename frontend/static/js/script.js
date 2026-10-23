@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- MAP AND ELEMENT REFERENCES ---
-    const { map, markersLayer, convoyLayer } = createMap({
+    const mapView = createMap({
         mapId: 'map',
         initialCenter: [28.6139, 77.2090],
         zoom: 7,
@@ -62,10 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let routeCoordinates = [];
     let directionSteps = [];
-    let routeLayer = null;
-    let positionMarker = null;
-    let positionMarkerIsArrow = false;
-    let lastHeading = null;
     let watchId = null;
     let lastKnownPosition = null;
     let convoyRoomId = null;
@@ -73,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let convoySharedDestination = null;
     let convoyAutoRouteInFlight = false;
     let convoyPollTimer = null;
-    const convoyMarkers = new Map();
 
     const startNavBtn = document.getElementById('start-nav-btn');
     const originInput = document.getElementById('origin');
@@ -166,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateBackendStatus();
     setInterval(updateBackendStatus, 20000);
     window.addEventListener('resize', () => {
-        map.invalidateSize();
+        mapView.invalidateSize();
     });
 
     // --- MAIN FUNCTIONS ---
@@ -254,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingItem.appendChild(spinner);
         loadingItem.appendChild(document.createTextNode(`Searching for "${query}"...`));
         stopsUl.appendChild(loadingItem);
-        markersLayer.clearLayers();
+        mapView.clearStopMarkers();
         customQueryInput.value = ''; // Clear input after search
         setStopSearchLoading(true);
 
@@ -282,14 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (data.stops && data.stops.length > 0) {
                 data.stops.forEach(stop => {
-                    const marker = L.marker([stop.location.lat, stop.location.lng]).addTo(markersLayer);
-                    marker.bindPopup(`<b>${escapeHtml(stop.name)}</b><br>Rating: ${escapeHtml(stop.rating || 'N/A')}<br>${escapeHtml(stop.distance)} · ${escapeHtml(stop.duration)}`);
+                    const marker = mapView.addStopMarker(
+                        [stop.location.lat, stop.location.lng],
+                        `<b>${escapeHtml(stop.name)}</b><br>Rating: ${escapeHtml(stop.rating || 'N/A')}<br>${escapeHtml(stop.distance)} · ${escapeHtml(stop.duration)}`,
+                    );
 
                     const li = document.createElement('li');
                     li.className = 'stop-item';
                     li.innerHTML = `<span class="stop-item-name">${escapeHtml(stop.name)}</span><span class="stop-item-meta">⭐ ${escapeHtml(stop.rating || 'N/A')} · ${escapeHtml(stop.distance)} · ${escapeHtml(stop.duration)}</span>`;
                     li.addEventListener('click', () => {
-                        map.flyTo([stop.location.lat, stop.location.lng], 16);
+                        mapView.flyTo([stop.location.lat, stop.location.lng], 16);
                         marker.openPopup();
                         // On mobile, collapse the sheet so the map is fully visible
                         if (window.innerWidth <= 640) {
@@ -324,13 +321,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastKnownPosition = position;
                 const latLng = [position.coords.latitude, position.coords.longitude];
 
-                const isFirstFix = !positionMarker;
-                updatePositionMarker(latLng, position.coords.heading);
+                const isFirstFix = !mapView.hasPositionMarker();
+                mapView.updatePositionMarker(latLng, position.coords.heading);
                 if (isFirstFix) {
                     // Zoom into user position when GPS first locks in
-                    map.setView(latLng, 15, { animate: true });
+                    mapView.setView(latLng, 15);
                 } else {
-                    map.panTo(latLng);
+                    mapView.panTo(latLng);
                 }
                 updateCurrentTurn(latLng);
 
@@ -346,47 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-    }
-
-    function createHeadingArrowIcon(heading) {
-        return L.divIcon({
-            className: 'nav-arrow-icon',
-            html: `<div class="nav-arrow-rot" style="transform: rotate(${heading}deg)">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2 4 21l8-4 8 4z"/></svg>
-            </div>`,
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
-        });
-    }
-
-    // Show a plain dot until the device reports a real heading, then a rotating arrow.
-    // Once upgraded to an arrow we keep it (retaining the last heading) to avoid flicker when stationary.
-    function updatePositionMarker(latLng, heading) {
-        const hasHeading = typeof heading === 'number' && !Number.isNaN(heading);
-
-        if (hasHeading) {
-            lastHeading = heading;
-            if (!positionMarker || !positionMarkerIsArrow) {
-                if (positionMarker) map.removeLayer(positionMarker);
-                positionMarker = L.marker(latLng, { icon: createHeadingArrowIcon(heading), zIndexOffset: 1000 }).addTo(map);
-                positionMarker.bindPopup('<b>You are here</b>');
-                positionMarkerIsArrow = true;
-            } else {
-                positionMarker.setLatLng(latLng);
-                const rot = positionMarker.getElement()?.querySelector('.nav-arrow-rot');
-                if (rot) rot.style.transform = `rotate(${heading}deg)`;
-            }
-            return;
-        }
-
-        if (!positionMarker) {
-            positionMarker = L.circleMarker(latLng, { radius: 8, color: '#1d4ed8', fillColor: '#3498db', fillOpacity: 1, weight: 2 }).addTo(map);
-            positionMarker.bindPopup('<b>You are here</b>').openPopup();
-            positionMarkerIsArrow = false;
-        } else {
-            // No fresh heading: just move whatever marker we already have (dot or last arrow).
-            positionMarker.setLatLng(latLng);
-        }
     }
 
     function updateCurrentTurn(currentLatLng) {
@@ -435,26 +391,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function displayRoute(coordinates) {
-        routeLayer = L.polyline(coordinates, { color: '#007bff', weight: 5 }).addTo(map);
         const sheetHeight = window.innerWidth <= 640 ? 260 : 0;
-        map.fitBounds(routeLayer.getBounds(), {
-            paddingBottomRight: [0, sheetHeight],
-            paddingTopLeft: [0, 0],
-        });
-        setTimeout(() => map.invalidateSize(), 120);
+        mapView.showRoute(coordinates, { bottomPadding: sheetHeight });
     }
 
     function resetUI() {
         // Intentionally does NOT clear stops/markers — those persist until a new search runs.
         currentTurnPanel.innerHTML = '';
         currentTurnPanel.classList.add('hidden');
-        if (routeLayer) map.removeLayer(routeLayer);
-        if (positionMarker) {
-            map.removeLayer(positionMarker);
-            positionMarker = null;
-            positionMarkerIsArrow = false;
-            lastHeading = null;
-        }
+        mapView.clearRoute();
+        mapView.clearPositionMarker();
         if (watchId !== null) {
             navigator.geolocation.clearWatch(watchId);
             watchId = null;
@@ -584,8 +530,7 @@ document.addEventListener('DOMContentLoaded', () => {
         convoySession.classList.add('hidden');
         convoyActiveRoom.textContent = '';
         convoyMembersUl.innerHTML = '';
-        convoyLayer.clearLayers();
-        convoyMarkers.clear();
+        mapView.clearConvoyMarkers();
         convoySharedDestination = null;
         convoyAutoRouteInFlight = false;
         if (convoyPollTimer) {
@@ -682,8 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
             members,
             convoyMemberId,
             convoyMembersUl,
-            convoyMarkers,
-            convoyLayer,
+            mapView,
         });
     }
 });

@@ -15,8 +15,7 @@ export function renderConvoyMembersUI({
     members,
     convoyMemberId,
     convoyMembersUl,
-    convoyMarkers,
-    convoyLayer,
+    mapView,
 }) {
     convoyMembersUl.innerHTML = '';
     const activeMemberIds = new Set();
@@ -37,45 +36,16 @@ export function renderConvoyMembersUI({
 
             item.textContent = `${label}: ${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`;
 
-            let marker = convoyMarkers.get(member.member_id);
-            if (!marker) {
-                marker = L.circleMarker(markerLatLng, {
-                    radius: isMe ? 10 : 8,
-                    color: isMe ? '#1d4ed8' : '#9a3412',
-                    fillColor: isMe ? '#2563eb' : '#f97316',
-                    fillOpacity: 0.95,
-                    weight: 2,
-                }).addTo(convoyLayer);
-                convoyMarkers.set(member.member_id, marker);
-            } else {
-                marker.setLatLng(markerLatLng);
-                marker.setStyle({
-                    radius: isMe ? 10 : 8,
-                    color: isMe ? '#1d4ed8' : '#9a3412',
-                    fillColor: isMe ? '#2563eb' : '#f97316',
-                    fillOpacity: 0.95,
-                    weight: 2,
-                });
-            }
-
             const safeLabel = escapeHtml(label);
-            marker.bindPopup(`<b>${safeLabel}</b><br>${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`);
-            marker.bindTooltip(safeLabel, {
-                permanent: true,
-                direction: 'top',
-                offset: [0, -12],
-                className: 'convoy-label',
+            mapView.upsertConvoyMarker(member.member_id, markerLatLng, {
+                isMe,
+                label: safeLabel,
+                popupHtml: `<b>${safeLabel}</b><br>${baseLat.toFixed(5)}, ${baseLng.toFixed(5)}`,
             });
-            marker.bringToFront();
             activeMemberIds.add(member.member_id);
         }
         convoyMembersUl.appendChild(item);
     });
 
-    for (const [memberId, marker] of convoyMarkers.entries()) {
-        if (!activeMemberIds.has(memberId)) {
-            convoyLayer.removeLayer(marker);
-            convoyMarkers.delete(memberId);
-        }
-    }
+    mapView.removeConvoyMarkersExcept(activeMemberIds);
 }
