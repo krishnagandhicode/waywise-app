@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import copy
+import math
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
@@ -51,7 +52,11 @@ ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
 # The Routes API rejects requests without a field mask, and the fields asked
 # for decide the billing SKU, so request exactly what get_route_with_google reads.
 ROUTES_FIELD_MASK = "routes.polyline.encodedPolyline,routes.legs.steps.navigationInstruction"
-PLACES_API_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+# rating is what bumps this call to the higher Places SKU; it is kept because
+# the stop list shows it.
+PLACES_FIELD_MASK = "places.id,places.displayName,places.location,places.rating"
+GOOGLE_PLACES_SEARCH_RADIUS_METERS = 15000.0
 ROUTE_MATRIX_API_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
 # status must be in the mask: without it every element reads as OK.
 ROUTE_MATRIX_FIELD_MASK = "originIndex,destinationIndex,status,condition,distanceMeters,duration"
@@ -466,6 +471,71 @@ def find_places_with_overpass(route_coordinates, place_query):
             return all_candidates, (not any_successful_response)
 
     return all_candidates, (not any_successful_response)
+
+def search_box_around(point, half_size_meters):
+    """A lat/lng rectangle extending half_size_meters each way from point.
+
+    Text Search (New) only treats the area as a hard limit when it is given as
+    a locationRestriction rectangle; a locationBias circle is a preference and
+    lets far-away results through. This box matches the legacy Nearby Search
+    radius, which was a hard limit.
+    """
+    lat, lng = point[0], point[1]
+    lat_delta = half_size_meters / 111_320
+    lng_delta = half_size_meters / (111_320 * max(math.cos(math.radians(lat)), 0.01))
+    return {
+        "low": {"latitude": max(lat - lat_delta, -90.0), "longitude": max(lng - lng_delta, -180.0)},
+        "high": {"latitude": min(lat + lat_delta, 90.0), "longitude": min(lng + lng_delta, 180.0)},
+    }
+
+def find_places_with_google(route_coordinates, place_query):
+    """Searches Places API (New) Text Search around points sampled on the route.
+
+    Returns (candidates keyed by place id, any_successful_response). A 200 with
+    no places is a real "nothing here" and counts as success so empty areas
+    still cache; 5xx and network errors are transient and skipped; any other
+    4xx means the key or request is bad, so it is raised.
+    """
+    # Cap sample points (and spread them across the whole route) so billed call
+    # volume stays bounded regardless of route length.
+    if len(route_coordinates) > GOOGLE_MAX_SEARCH_POINTS:
+        search_interval = max(len(route_coordinates) // GOOGLE_MAX_SEARCH_POINTS, 1)
+        sampled_indices = list(range(0, len(route_coordinates), search_interval))[:GOOGLE_MAX_SEARCH_POINTS]
+    else:
+        sampled_indices = list(range(len(route_coordinates)))
+
+    all_candidates = {}
+    any_successful_response = False
+    for i in sampled_indices:
+        point = route_coordinates[i]
+        body = {
+            "textQuery": place_query,
+            "pageSize": 20,
+            "locationRestriction": {"rectangle": search_box_around(point, GOOGLE_PLACES_SEARCH_RADIUS_METERS)},
+        }
+        try:
+            data = post_to_google(PLACES_TEXT_SEARCH_URL, body, PLACES_FIELD_MASK)
+        except requests.exceptions.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else 0
+            if 400 <= status_code < 500:
+                raise ValueError(f"Google Places API rejected the request (HTTP {status_code})") from exc
+            continue
+        except requests.exceptions.RequestException:
+            continue
+
+        any_successful_response = True
+        for place in data.get("places", []):
+            location = place.get("location") or {}
+            if not place.get("id") or location.get("latitude") is None or location.get("longitude") is None:
+                continue
+            all_candidates[place["id"]] = {
+                "name": (place.get("displayName") or {}).get("text", "Unnamed place"),
+                "rating": place.get("rating", "N/A"),
+                "place_id": place["id"],
+                "location": {"lat": location["latitude"], "lng": location["longitude"]},
+            }
+
+    return all_candidates, any_successful_response
 
 def rank_stops_with_osrm_table(stops, ranking_origin):
     if not stops:
@@ -893,44 +963,10 @@ def find_stops():
             if cached_stop_data and (time.time() - cached_stop_data["timestamp"] <= STOP_CACHE_TTL_SECONDS):
                 on_route_stops = copy.deepcopy(cached_stop_data.get("stops", []))
             else:
-                all_candidates = {}
-                any_successful_response = False
-                # Cap Places sample points (and spread them across the whole route) so
-                # billed call volume stays bounded regardless of route length. The free
-                # path caps via FREE_MAX_SEARCH_POINTS; mirror that for the Google path.
-                if len(route_coordinates) > GOOGLE_MAX_SEARCH_POINTS:
-                    search_interval = max(len(route_coordinates) // GOOGLE_MAX_SEARCH_POINTS, 1)
-                    sampled_indices = list(range(0, len(route_coordinates), search_interval))[:GOOGLE_MAX_SEARCH_POINTS]
-                else:
-                    sampled_indices = list(range(len(route_coordinates)))
-                for i in sampled_indices:
-                    midpoint = route_coordinates[i]
-                    places_params = {
-                        "location": f"{midpoint[0]},{midpoint[1]}", "radius": 15000,
-                        "keyword": place_query, "key": API_KEY
-                    }
-                    places_response = requests.get(PLACES_API_URL, params=places_params, timeout=15)
-                    places_data = places_response.json()
-                    status = places_data.get("status")
-                    if status == "OK":
-                        any_successful_response = True
-                        for place in places_data.get("results", []):
-                            all_candidates[place["place_id"]] = place
-                    elif status == "ZERO_RESULTS":
-                        # A definitive "nothing here", not a failure. Counts as a
-                        # real answer so genuinely empty areas still cache instead
-                        # of re-billing Places on every request.
-                        any_successful_response = True
-                    elif status in {"REQUEST_DENIED", "OVER_DAILY_LIMIT", "OVER_QUERY_LIMIT", "INVALID_REQUEST"}:
-                        raise ValueError(f"Google Places API returned status: {status}")
-
+                all_candidates, any_successful_response = find_places_with_google(route_coordinates, place_query)
                 for place in all_candidates.values():
-                    place_loc = place.get("geometry", {}).get("location")
-                    if place_loc and is_on_route(place_loc, route_coordinates):
-                        on_route_stops.append({
-                            "name": place.get("name"), "rating": place.get("rating", "N/A"),
-                            "place_id": place.get("place_id"), "location": place_loc
-                        })
+                    if is_on_route(place["location"], route_coordinates):
+                        on_route_stops.append(place)
 
                 # Avoid caching transient outage empties so retries can recover
                 # quickly, matching the free path above. Without this, one bad
