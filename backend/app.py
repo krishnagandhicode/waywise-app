@@ -77,6 +77,10 @@ STOPS_RESPONSE_LIMIT = int(os.getenv("STOPS_RESPONSE_LIMIT", "8"))
 STOP_CACHE_TTL_SECONDS = int(os.getenv("STOP_CACHE_TTL_SECONDS", "240"))
 RANKED_STOPS_CACHE_TTL_SECONDS = int(os.getenv("RANKED_STOPS_CACHE_TTL_SECONDS", "45"))
 GEOCODE_CACHE_TTL_SECONDS = int(os.getenv("GEOCODE_CACHE_TTL_SECONDS", "1800"))
+# TTL alone only bounds a cache by its arrival rate, so distinct-key traffic
+# (every origin/destination/query combination is a new key) can still grow
+# them for the whole TTL. Each cache is also capped at this many entries.
+CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "500"))
 MOCK_MODE = os.getenv("WAYWISE_MOCK_MODE", "false").lower() in ("1", "true", "yes", "on")
 ROUTE_CACHE_TTL_SECONDS = int(os.getenv("ROUTE_CACHE_TTL_SECONDS", "900"))
 DISTANCE_MATRIX_MAX_DESTINATIONS = int(os.getenv("DISTANCE_MATRIX_MAX_DESTINATIONS", "25"))
@@ -141,18 +145,41 @@ def find_stale_cache_keys(cache, ttl_seconds, current_time):
         if current_time - value.get("timestamp", 0) > ttl_seconds
     ]
 
+def trim_cache_to_size(cache, max_entries):
+    """Evicts the oldest entries once a cache holds more than max_entries.
+
+    Works on a list() snapshot for the same reason as find_stale_cache_keys.
+    """
+    excess = len(cache) - max_entries
+    if excess <= 0:
+        return
+    oldest_first = sorted(list(cache.items()), key=lambda item: item[1].get("timestamp", 0))
+    for key, _value in oldest_first[:excess]:
+        cache.pop(key, None)
+
 def cleanup_stop_candidate_cache(now=None):
     current_time = now or time.time()
     for key in find_stale_cache_keys(stop_candidate_cache, STOP_CACHE_TTL_SECONDS, current_time):
         stop_candidate_cache.pop(key, None)
+    trim_cache_to_size(stop_candidate_cache, CACHE_MAX_ENTRIES)
 
     for key in find_stale_cache_keys(ranked_stops_cache, RANKED_STOPS_CACHE_TTL_SECONDS, current_time):
         ranked_stops_cache.pop(key, None)
+    trim_cache_to_size(ranked_stops_cache, CACHE_MAX_ENTRIES)
 
 def cleanup_geocode_cache(now=None):
     current_time = now or time.time()
     for key in find_stale_cache_keys(geocode_cache, GEOCODE_CACHE_TTL_SECONDS, current_time):
         geocode_cache.pop(key, None)
+    trim_cache_to_size(geocode_cache, CACHE_MAX_ENTRIES)
+
+def cleanup_route_cache(now=None):
+    # Route entries were only TTL-checked on read and never swept, so every
+    # distinct trip stayed in memory until the process restarted.
+    current_time = now or time.time()
+    for key in find_stale_cache_keys(route_cache, ROUTE_CACHE_TTL_SECONDS, current_time):
+        route_cache.pop(key, None)
+    trim_cache_to_size(route_cache, CACHE_MAX_ENTRIES)
 
 def get_stop_cache_key(origin, destination, place_query):
     return f"{MAP_PROVIDER}::{origin.strip().lower()}::{destination.strip().lower()}::{(place_query or '').strip().lower()}"
@@ -653,6 +680,7 @@ def serve_sitemap():
 def health():
     cleanup_geocode_cache()
     cleanup_stop_candidate_cache()
+    cleanup_route_cache()
     cleanup_stale_convoys()
     with convoy_lock:
         active_convoy_rooms = len(convoy_rooms)
@@ -702,6 +730,7 @@ def find_stops():
         live_lat, live_lng = parse_live_coordinates(live_lat_raw, live_lng_raw)
         cleanup_geocode_cache()
         cleanup_stop_candidate_cache()
+        cleanup_route_cache()
 
         if MOCK_MODE:
             route_coordinates, direction_steps = get_mock_route_and_directions(origin, destination)
