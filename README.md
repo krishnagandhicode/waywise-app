@@ -8,7 +8,7 @@ long the detour actually takes and whether the stop is still ahead of you.
 
 **Live app:** https://www.waywiseapp.tech
 
-![WayWise in Google mode: pharmacies along the Chandigarh to Shimla route, ranked by detour time](docs/images/waywise-google-light.png)
+![WayWise in Google mode: fuel stops along the route near Mohali, ranked by detour time](docs/images/waywise-google-dark.png)
 
 ## Features
 
@@ -25,9 +25,9 @@ long the detour actually takes and whether the stop is still ahead of you.
 - **Light and dark themes**, and a layout that turns into a bottom sheet on phones.
 
 <details>
-<summary>Dark theme</summary>
+<summary>Light theme</summary>
 
-![WayWise in dark theme](docs/images/waywise-google-dark.png)
+![WayWise in light theme: pharmacies along the Chandigarh to Shimla route](docs/images/waywise-google-light.png)
 
 </details>
 
