@@ -118,6 +118,7 @@ def test_route_only_makes_no_poi_or_ranking_calls(client, monkeypatch):
         raise AssertionError("route_only must not make outbound HTTP calls")
 
     monkeypatch.setattr(backend_app_module.requests, "get", explode)
+    monkeypatch.setattr(backend_app_module.requests, "post", explode)
 
     assert search(client, query="route_only").status_code == 200
 
@@ -181,13 +182,12 @@ def test_repeat_search_is_served_from_the_ranked_cache(client, monkeypatch):
 
     calls = {"places": 0, "matrix": 0}
     places_payload = {
-        "status": "OK",
-        "results": [
+        "places": [
             {
-                "place_id": "p1",
-                "name": "Test Pharmacy",
+                "id": "p1",
+                "displayName": {"text": "Test Pharmacy"},
                 "rating": 4.5,
-                "geometry": {"location": {"lat": 30.75, "lng": 76.80}},
+                "location": {"latitude": 30.75, "longitude": 76.80},
             }
         ],
     }
@@ -195,16 +195,13 @@ def test_repeat_search_is_served_from_the_ranked_cache(client, monkeypatch):
         {"status": {}, "condition": "ROUTE_EXISTS", "distanceMeters": 2000, "duration": "300s"}
     ]
 
-    def fake_get(url, *args, **kwargs):
+    def fake_post(url, *args, **kwargs):
+        if url == backend_app_module.ROUTE_MATRIX_API_URL:
+            calls["matrix"] += 1
+            return FakeResponse(matrix_payload)
         calls["places"] += 1
         return FakeResponse(places_payload)
 
-    def fake_post(url, *args, **kwargs):
-        assert url == backend_app_module.ROUTE_MATRIX_API_URL
-        calls["matrix"] += 1
-        return FakeResponse(matrix_payload)
-
-    monkeypatch.setattr(backend_app_module.requests, "get", fake_get)
     monkeypatch.setattr(backend_app_module.requests, "post", fake_post)
 
     first = search(client)
@@ -232,11 +229,11 @@ def test_google_places_sample_points_stay_capped_on_a_long_route(client, monkeyp
 
     calls = {"places": 0}
 
-    def fake_get(url, *args, **kwargs):
+    def fake_post(url, *args, **kwargs):
         calls["places"] += 1
-        return FakeResponse({"status": "ZERO_RESULTS", "results": []})
+        return FakeResponse({})
 
-    monkeypatch.setattr(backend_app_module.requests, "get", fake_get)
+    monkeypatch.setattr(backend_app_module.requests, "post", fake_post)
 
     response = search(client)
 

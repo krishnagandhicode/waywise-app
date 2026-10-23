@@ -151,24 +151,22 @@ def google_search(monkeypatch):
     monkeypatch.setattr(
         backend_app_module, "get_decoded_route", lambda o, d: (ROUTE, ["Head north"], "google")
     )
-    places_payload = {
-        "status": "OK",
-        "results": [
-            {"place_id": "p1", "name": "Test Pharmacy", "geometry": {"location": {"lat": 30.75, "lng": 76.80}}}
-        ],
-    }
-    monkeypatch.setattr(
-        backend_app_module.requests, "get", lambda *a, **kw: FakeResponse(places_payload)
-    )
 
 
 def test_matrix_failure_falls_back_to_straight_line_ranking(client, google_search, monkeypatch):
     """A ranking outage must not cost the user their stops."""
-    monkeypatch.setattr(
-        backend_app_module.requests,
-        "post",
-        lambda *a, **kw: FakeResponse({"error": {}}, status_code=503),
-    )
+    places_payload = {
+        "places": [
+            {"id": "p1", "displayName": {"text": "Test Pharmacy"}, "location": {"latitude": 30.75, "longitude": 76.80}}
+        ],
+    }
+
+    def fake_post(url, *args, **kwargs):
+        if url == backend_app_module.ROUTE_MATRIX_API_URL:
+            return FakeResponse({"error": {}}, status_code=503)
+        return FakeResponse(places_payload)
+
+    monkeypatch.setattr(backend_app_module.requests, "post", fake_post)
 
     response = client.get(
         "/find_stops",
