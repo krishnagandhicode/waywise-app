@@ -16,6 +16,9 @@ class FakeResponse:
     def json(self):
         return self._payload
 
+    def raise_for_status(self):
+        return None
+
 
 @pytest.fixture
 def google_provider(monkeypatch):
@@ -83,27 +86,16 @@ def test_successful_search_is_cached(client, google_provider, monkeypatch):
             }
         ],
     }
-    matrix_payload = {
-        "status": "OK",
-        "rows": [
-            {
-                "elements": [
-                    {
-                        "status": "OK",
-                        "distance": {"text": "2.0 km", "value": 2000},
-                        "duration": {"text": "5 mins", "value": 300},
-                    }
-                ]
-            }
-        ],
-    }
+    matrix_payload = [
+        {"status": {}, "condition": "ROUTE_EXISTS", "distanceMeters": 2000, "duration": "300s"}
+    ]
 
-    def fake_get(url, *args, **kwargs):
-        if url == backend_app_module.DISTANCE_MATRIX_API_URL:
-            return FakeResponse(matrix_payload)
-        return FakeResponse(places_payload)
-
-    monkeypatch.setattr(backend_app_module.requests, "get", fake_get)
+    monkeypatch.setattr(
+        backend_app_module.requests, "get", lambda *a, **kw: FakeResponse(places_payload)
+    )
+    monkeypatch.setattr(
+        backend_app_module.requests, "post", lambda *a, **kw: FakeResponse(matrix_payload)
+    )
 
     response = search(client)
     stops = response.get_json()["stops"]

@@ -191,29 +191,21 @@ def test_repeat_search_is_served_from_the_ranked_cache(client, monkeypatch):
             }
         ],
     }
-    matrix_payload = {
-        "status": "OK",
-        "rows": [
-            {
-                "elements": [
-                    {
-                        "status": "OK",
-                        "distance": {"text": "2.0 km", "value": 2000},
-                        "duration": {"text": "5 mins", "value": 300},
-                    }
-                ]
-            }
-        ],
-    }
+    matrix_payload = [
+        {"status": {}, "condition": "ROUTE_EXISTS", "distanceMeters": 2000, "duration": "300s"}
+    ]
 
     def fake_get(url, *args, **kwargs):
-        if url == backend_app_module.DISTANCE_MATRIX_API_URL:
-            calls["matrix"] += 1
-            return FakeResponse(matrix_payload)
         calls["places"] += 1
         return FakeResponse(places_payload)
 
+    def fake_post(url, *args, **kwargs):
+        assert url == backend_app_module.ROUTE_MATRIX_API_URL
+        calls["matrix"] += 1
+        return FakeResponse(matrix_payload)
+
     monkeypatch.setattr(backend_app_module.requests, "get", fake_get)
+    monkeypatch.setattr(backend_app_module.requests, "post", fake_post)
 
     first = search(client)
     after_first = dict(calls)
