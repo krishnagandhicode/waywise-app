@@ -4,6 +4,7 @@ import requests
 import copy
 import math
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from uuid import uuid4
 from flask import Flask, request, jsonify, send_from_directory, render_template
@@ -57,6 +58,10 @@ PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 # the stop list shows it.
 PLACES_FIELD_MASK = "places.id,places.displayName,places.location,places.rating"
 GOOGLE_PLACES_SEARCH_RADIUS_METERS = 15000.0
+# Places sample points are independent calls, so they run concurrently. This
+# changes latency only; the number of billed calls is still capped by
+# GOOGLE_MAX_SEARCH_POINTS.
+GOOGLE_PLACES_MAX_PARALLEL = int(os.getenv("GOOGLE_PLACES_MAX_PARALLEL", "4"))
 ROUTE_MATRIX_API_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
 # status must be in the mask: without it every element reads as OK.
 ROUTE_MATRIX_FIELD_MASK = "originIndex,destinationIndex,status,condition,distanceMeters,duration"
@@ -500,25 +505,32 @@ def find_places_with_google(route_coordinates, place_query):
     else:
         sampled_indices = list(range(len(route_coordinates)))
 
-    all_candidates = {}
-    any_successful_response = False
-    for i in sampled_indices:
-        point = route_coordinates[i]
+    def search_around(point):
         body = {
             "textQuery": place_query,
             "pageSize": 20,
             "locationRestriction": {"rectangle": search_box_around(point, GOOGLE_PLACES_SEARCH_RADIUS_METERS)},
         }
         try:
-            data = post_to_google(PLACES_TEXT_SEARCH_URL, body, PLACES_FIELD_MASK)
+            return post_to_google(PLACES_TEXT_SEARCH_URL, body, PLACES_FIELD_MASK)
         except requests.exceptions.HTTPError as exc:
             status_code = exc.response.status_code if exc.response is not None else 0
             if 400 <= status_code < 500:
                 raise ValueError(f"Google Places API rejected the request (HTTP {status_code})") from exc
-            continue
+            return None
         except requests.exceptions.RequestException:
-            continue
+            return None
 
+    points = [route_coordinates[i] for i in sampled_indices]
+    with ThreadPoolExecutor(max_workers=max(1, min(GOOGLE_PLACES_MAX_PARALLEL, len(points)))) as executor:
+        # map() yields in input order and re-raises a worker's ValueError here.
+        responses = list(executor.map(search_around, points))
+
+    all_candidates = {}
+    any_successful_response = False
+    for data in responses:
+        if data is None:
+            continue
         any_successful_response = True
         for place in data.get("places", []):
             location = place.get("location") or {}
@@ -959,7 +971,22 @@ def find_stops():
             if cached_stop_data and (time.time() - cached_stop_data["timestamp"] <= STOP_CACHE_TTL_SECONDS):
                 on_route_stops = copy.deepcopy(cached_stop_data.get("stops", []))
             else:
-                all_candidates, any_successful_response = find_places_with_google(route_coordinates, place_query)
+                try:
+                    all_candidates, any_successful_response = find_places_with_google(route_coordinates, place_query)
+                    google_error = None
+                except ValueError as exc:
+                    all_candidates, any_successful_response, google_error = {}, False, exc
+
+                used_free_fallback = False
+                if not any_successful_response and GOOGLE_FALLBACK_ENABLED:
+                    # A rejected key, an exhausted quota or an outage should
+                    # degrade to OpenStreetMap results, as routing already does,
+                    # rather than leave the user with no stops.
+                    all_candidates, _overpass_unavailable = find_places_with_overpass(route_coordinates, place_query)
+                    used_free_fallback = True
+                elif google_error is not None:
+                    raise google_error
+
                 for place in all_candidates.values():
                     if is_on_route(place["location"], route_coordinates):
                         on_route_stops.append(place)
@@ -967,8 +994,14 @@ def find_stops():
                 # Avoid caching transient outage empties so retries can recover
                 # quickly, matching the free path above. Without this, one bad
                 # Places response pins an empty result for STOP_CACHE_TTL_SECONDS
-                # even after Google recovers.
-                if on_route_stops or any_successful_response:
+                # even after Google recovers. Fallback results are not cached
+                # either, so the next search goes back to Google.
+                if used_free_fallback:
+                    if on_route_stops:
+                        provider_notice = "Google search is unavailable, so these results come from OpenStreetMap."
+                    else:
+                        provider_notice = "Stop search is temporarily unavailable. Please retry in a few seconds."
+                elif on_route_stops or any_successful_response:
                     stop_candidate_cache[stop_cache_key] = {
                         "timestamp": time.time(),
                         "stops": copy.deepcopy(on_route_stops),
