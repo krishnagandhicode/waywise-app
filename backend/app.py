@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import copy
+import math
 from pathlib import Path
 from threading import Lock
 from uuid import uuid4
@@ -467,6 +468,22 @@ def find_places_with_overpass(route_coordinates, place_query):
 
     return all_candidates, (not any_successful_response)
 
+def search_box_around(point, half_size_meters):
+    """A lat/lng rectangle extending half_size_meters each way from point.
+
+    Text Search (New) only treats the area as a hard limit when it is given as
+    a locationRestriction rectangle; a locationBias circle is a preference and
+    lets far-away results through. This box matches the legacy Nearby Search
+    radius, which was a hard limit.
+    """
+    lat, lng = point[0], point[1]
+    lat_delta = half_size_meters / 111_320
+    lng_delta = half_size_meters / (111_320 * max(math.cos(math.radians(lat)), 0.01))
+    return {
+        "low": {"latitude": max(lat - lat_delta, -90.0), "longitude": max(lng - lng_delta, -180.0)},
+        "high": {"latitude": min(lat + lat_delta, 90.0), "longitude": min(lng + lng_delta, 180.0)},
+    }
+
 def find_places_with_google(route_coordinates, place_query):
     """Searches Places API (New) Text Search around points sampled on the route.
 
@@ -490,12 +507,7 @@ def find_places_with_google(route_coordinates, place_query):
         body = {
             "textQuery": place_query,
             "pageSize": 20,
-            "locationBias": {
-                "circle": {
-                    "center": {"latitude": point[0], "longitude": point[1]},
-                    "radius": GOOGLE_PLACES_SEARCH_RADIUS_METERS,
-                }
-            },
+            "locationRestriction": {"rectangle": search_box_around(point, GOOGLE_PLACES_SEARCH_RADIUS_METERS)},
         }
         try:
             data = post_to_google(PLACES_TEXT_SEARCH_URL, body, PLACES_FIELD_MASK)

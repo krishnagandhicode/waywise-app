@@ -143,11 +143,28 @@ def test_places_request_uses_text_search_with_a_field_mask(client, google_provid
     assert first["headers"]["X-Goog-FieldMask"] == backend_app_module.PLACES_FIELD_MASK
     assert first["headers"]["X-Goog-Api-Key"] == "test-key"
     assert first["json"]["textQuery"] == "pharmacy"
-    assert first["json"]["locationBias"]["circle"]["center"] == {"latitude": ROUTE[0][0], "longitude": ROUTE[0][1]}
+    # A bias circle would let far-away results through; the restriction
+    # rectangle is a hard limit, like the legacy Nearby Search radius.
+    assert "locationBias" not in first["json"]
+    box = first["json"]["locationRestriction"]["rectangle"]
+    assert box["low"]["latitude"] < ROUTE[0][0] < box["high"]["latitude"]
+    assert box["low"]["longitude"] < ROUTE[0][1] < box["high"]["longitude"]
+
+
+def test_search_box_spans_the_search_radius_each_way():
+    from haversine import Unit, haversine
+
+    box = backend_app_module.search_box_around((30.7, 76.8), 15000)
+
+    north = haversine((30.7, 76.8), (box["high"]["latitude"], 76.8), unit=Unit.METERS)
+    east = haversine((30.7, 76.8), (30.7, box["high"]["longitude"]), unit=Unit.METERS)
+    assert north == pytest.approx(15000, rel=0.01)
+    assert east == pytest.approx(15000, rel=0.01)
 
 
 def test_places_far_from_the_route_are_dropped(client, google_provider, monkeypatch):
-    """locationBias only biases results, so off-route places can come back."""
+    """Sample-point boxes are wider than the on-route distance, so Places can
+    still return stops that are not actually near the route."""
     far_place = dict(PLACE, id="far", location={"latitude": 28.61, "longitude": 77.20})
     answer_places_with(monkeypatch, FakeResponse({"places": [PLACE, far_place]}))
 
