@@ -45,3 +45,13 @@ def test_existing_query_mappings_are_unchanged(query, expected):
 @pytest.mark.parametrize("query", ["", None, "something unmapped"])
 def test_unmapped_queries_fall_back_to_generic_filter(query):
     assert get_overpass_filter_for_query(query) == GENERIC_FILTER
+
+
+get_free_search_point_limit = backend_app_module.get_free_search_point_limit
+
+
+@pytest.mark.parametrize("query", ["pharmacy", "chemist", "drugstore", "medicine"])
+def test_pharmacy_queries_use_the_short_search_point_tier(query):
+    """Each sample point is a sequential Overpass call, so the sparse pharmacy
+    search should not pay for the full FREE_MAX_SEARCH_POINTS."""
+    assert get_free_search_point_limit(query) == min(backend_app_module.FREE_MAX_SEARCH_POINTS, 4)
