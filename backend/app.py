@@ -785,12 +785,26 @@ def get_mock_stops(place_query):
         {"name": "Traveler's Stop", "rating": 4.0, "distance": "3.0 km", "duration": "7 mins", "duration_seconds": 420, "place_id": "mock_generic_2", "location": {"lat": 31.4687, "lng": 77.2292}},
     ]
 
+METERS_PER_DEGREE_LATITUDE = 111_320
+
 def is_on_route(place_location, route_coordinates, max_distance_meters=1500):
     """Checks if a place is within a max distance from any point on the route."""
-    place_coords = (place_location['lat'], place_location['lng'])
+    place_lat, place_lng = place_location['lat'], place_location['lng']
+    place_coords = (place_lat, place_lng)
+
+    # Route polylines run to thousands of points, and most candidates are
+    # nowhere near most of them. A plain degree comparison rules those points
+    # out before paying for a haversine. The box is padded by 10% and sized
+    # for the narrowest longitude spacing near the place, so it never excludes
+    # a point haversine would accept; results are unchanged.
+    lat_margin = max_distance_meters * 1.1 / METERS_PER_DEGREE_LATITUDE
+    widest_lat = min(abs(place_lat) + lat_margin, 89.0)
+    lng_margin = lat_margin / math.cos(math.radians(widest_lat))
+
     for route_point in route_coordinates:
-        route_point_coords = (route_point[0], route_point[1])
-        distance = haversine(place_coords, route_point_coords, unit=Unit.METERS)
+        if abs(route_point[0] - place_lat) > lat_margin or abs(route_point[1] - place_lng) > lng_margin:
+            continue
+        distance = haversine(place_coords, (route_point[0], route_point[1]), unit=Unit.METERS)
         if distance <= max_distance_meters:
             return True
     return False
