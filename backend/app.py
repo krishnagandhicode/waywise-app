@@ -172,6 +172,10 @@ def get_free_search_point_limit(place_query):
     q = (place_query or "").lower()
     if "petrol" in q or "fuel" in q or "atm" in q or "bank" in q:
         return min(FREE_MAX_SEARCH_POINTS, 4)
+    # Pharmacies are sparse in OSM, so extra sample points rarely add results
+    # but each one is another sequential Overpass call on the request path.
+    if "pharmacy" in q or "chemist" in q or "drugstore" in q or "medicine" in q:
+        return min(FREE_MAX_SEARCH_POINTS, 4)
     if "restaurant" in q or "dhaba" in q or "food" in q:
         return min(FREE_MAX_SEARCH_POINTS, 5)
     return FREE_MAX_SEARCH_POINTS
