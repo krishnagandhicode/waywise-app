@@ -1,7 +1,6 @@
 import os
 import time
 import requests
-import re
 import copy
 from pathlib import Path
 from threading import Lock
@@ -48,7 +47,10 @@ if ALLOWED_ORIGINS:
 
 # API Configuration
 API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
-DIRECTIONS_API_URL = "https://maps.googleapis.com/maps/api/directions/json"
+ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
+# The Routes API rejects requests without a field mask, and the fields asked
+# for decide the billing SKU, so request exactly what get_route_with_google reads.
+ROUTES_FIELD_MASK = "routes.polyline.encodedPolyline,routes.legs.steps.navigationInstruction"
 PLACES_API_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 DISTANCE_MATRIX_API_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 MAP_PROVIDER = os.getenv("WAYWISE_MAP_PROVIDER", "free").strip().lower()
@@ -231,9 +233,6 @@ def serialize_room_members(room):
         for member_id, member in room["members"].items()
     ]
 
-def strip_html_tags(text):
-    return re.sub(r"<[^>]*>", "", text or "")
-
 def format_duration(seconds):
     seconds = int(max(seconds, 0))
     mins = seconds // 60
@@ -286,21 +285,48 @@ def geocode_with_nominatim(location_text):
     }
     return dict(result)
 
-def get_route_with_google(origin, destination):
+def post_to_google(url, body, field_mask, timeout=15):
+    """POSTs to a Google Maps Platform API that authenticates by header.
+
+    The newer APIs take the key as X-Goog-Api-Key rather than a ?key= query
+    parameter, which also keeps it out of proxy and access logs.
+    """
     if not API_KEY:
         raise ValueError("Google Maps API key is not configured")
-    params = {"origin": origin, "destination": destination, "key": API_KEY}
-    response = requests.get(DIRECTIONS_API_URL, params=params, timeout=15)
+    response = requests.post(
+        url,
+        json=body,
+        headers={"X-Goog-Api-Key": API_KEY, "X-Goog-FieldMask": field_mask},
+        timeout=timeout,
+    )
     response.raise_for_status()
-    data = response.json()
-    status = data.get("status")
-    if status == "OK" and data.get("routes"):
-        route = data["routes"][0]["legs"][0]
-        encoded_polyline = data["routes"][0]["overview_polyline"]["points"]
-        decoded_coordinates = polyline.decode(encoded_polyline)
-        direction_steps = [strip_html_tags(step.get("html_instructions")) for step in route.get("steps", [])]
-        return decoded_coordinates, direction_steps
-    raise ValueError(f"Google Directions API returned status: {status}")
+    return response.json()
+
+def get_route_with_google(origin, destination):
+    body = {
+        "origin": {"address": origin},
+        "destination": {"address": destination},
+        "travelMode": "DRIVE",
+        "polylineEncoding": "ENCODED_POLYLINE",
+    }
+    data = post_to_google(ROUTES_API_URL, body, ROUTES_FIELD_MASK)
+    routes = data.get("routes") or []
+    encoded_polyline = routes[0].get("polyline", {}).get("encodedPolyline") if routes else None
+    if not encoded_polyline:
+        raise ValueError("Google Routes API returned no route")
+
+    decoded_coordinates = polyline.decode(encoded_polyline)
+    # Routes API instructions are plain text, unlike the HTML that the legacy
+    # Directions API returned, so they can be used as-is.
+    direction_steps = [
+        step.get("navigationInstruction", {}).get("instructions")
+        for leg in routes[0].get("legs", [])
+        for step in leg.get("steps", [])
+    ]
+    direction_steps = [instruction for instruction in direction_steps if instruction]
+    if not direction_steps:
+        direction_steps = ["Proceed on the route", "Continue towards destination"]
+    return decoded_coordinates, direction_steps
 
 def get_route_with_osrm(origin, destination):
     origin_geo = geocode_with_nominatim(origin)
