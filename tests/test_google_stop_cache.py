@@ -285,3 +285,18 @@ def test_places_calls_run_concurrently(client, google_provider, monkeypatch):
     assert response.status_code == 200
     assert state["peak"] == 4
     assert elapsed < 0.6
+
+
+def test_places_request_asks_for_english_names(client, google_provider, monkeypatch):
+    calls = []
+
+    def fake_post(url, *args, **kwargs):
+        calls.append({"url": url, **kwargs})
+        return FakeResponse(MATRIX if url == backend_app_module.ROUTE_MATRIX_API_URL else {})
+
+    monkeypatch.setattr(backend_app_module.requests, "post", fake_post)
+
+    search(client)
+
+    places_calls = [c for c in calls if c["url"] == backend_app_module.PLACES_TEXT_SEARCH_URL]
+    assert places_calls and all(c["json"]["languageCode"] == "en" for c in places_calls)
