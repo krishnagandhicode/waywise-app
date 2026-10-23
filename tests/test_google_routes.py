@@ -141,3 +141,14 @@ def test_routes_api_failure_falls_back_to_the_free_route(capture_post, monkeypat
 
     assert provider == "free"
     assert steps == ["Free step"]
+
+
+def test_route_request_asks_for_english_instructions(capture_post):
+    """Without a languageCode Google picks a language from the caller's region,
+    which produced Assamese turn-by-turn steps for an English UI."""
+    calls, respond_with = capture_post
+    respond_with(routes_payload([{"steps": [step("Go")]}]))
+
+    backend_app_module.get_route_with_google("Chandigarh", "Shimla")
+
+    assert calls[0]["json"]["languageCode"] == backend_app_module.GOOGLE_LANGUAGE_CODE == "en"

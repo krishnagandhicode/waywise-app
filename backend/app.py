@@ -58,6 +58,9 @@ PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 # the stop list shows it.
 PLACES_FIELD_MASK = "places.id,places.displayName,places.location,places.rating"
 GOOGLE_PLACES_SEARCH_RADIUS_METERS = 15000.0
+# Without an explicit language Google picks one from the caller's account or
+# region, which returned turn-by-turn steps in Assamese for an English UI.
+GOOGLE_LANGUAGE_CODE = os.getenv("GOOGLE_LANGUAGE_CODE", "en")
 # Places sample points are independent calls, so they run concurrently. This
 # changes latency only; the number of billed calls is still capped by
 # GOOGLE_MAX_SEARCH_POINTS.
@@ -351,6 +354,7 @@ def get_route_with_google(origin, destination):
         "destination": {"address": destination},
         "travelMode": "DRIVE",
         "polylineEncoding": "ENCODED_POLYLINE",
+        "languageCode": GOOGLE_LANGUAGE_CODE,
     }
     data = post_to_google(ROUTES_API_URL, body, ROUTES_FIELD_MASK)
     routes = data.get("routes") or []
@@ -540,6 +544,7 @@ def find_places_with_google(route_coordinates, place_query):
         body = {
             "textQuery": place_query,
             "pageSize": 20,
+            "languageCode": GOOGLE_LANGUAGE_CODE,
             "locationRestriction": {"rectangle": search_box_around(point, GOOGLE_PLACES_SEARCH_RADIUS_METERS)},
         }
         try:
