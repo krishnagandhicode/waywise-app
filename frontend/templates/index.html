@@ -37,7 +37,9 @@
     </script>
 
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    {% if map_renderer != "google" %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    {% endif %}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -144,14 +146,19 @@
         </aside>
 
         <section class="map-container">
-            <div id="map"></div>
+            <div id="map"
+                 data-renderer="{{ map_renderer }}"
+                 data-google-key="{{ google_maps_js_api_key }}"
+                 data-google-map-id="{{ google_maps_map_id }}"></div>
             <div id="current-turn-panel" class="hidden"></div>
         </section>
     </main>
 
     <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
+    {% if map_renderer != "google" %}
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    {% endif %}
     <script type="module" src="/static/js/script.js"></script>
 </body>
 </html>

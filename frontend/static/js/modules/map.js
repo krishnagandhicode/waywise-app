@@ -147,6 +147,74 @@ export function createMap({ mapId, initialCenter, zoom }) {
     };
 }
 
+// A map view that draws nothing, used when the Google map cannot load. Search
+// results still list in the side panel.
+function createEmptyMapView() {
+    const noop = () => {};
+    return {
+        setView: noop,
+        panTo: noop,
+        flyTo: noop,
+        invalidateSize: noop,
+        showRoute: noop,
+        clearRoute: noop,
+        addStopMarker: () => ({ openPopup: noop }),
+        clearStopMarkers: noop,
+        hasPositionMarker: () => false,
+        updatePositionMarker: noop,
+        clearPositionMarker: noop,
+        upsertConvoyMarker: noop,
+        removeConvoyMarkersExcept: noop,
+        clearConvoyMarkers: noop,
+    };
+}
+
+// Wraps a map view so a failing map call is logged and skipped rather than
+// thrown into the caller. A Google map whose key is rejected after loading
+// throws from its own internals, and that must not take the stop list or
+// navigation panel down with it.
+function guardMapView(view) {
+    const fallback = createEmptyMapView();
+    const guarded = {};
+    Object.keys(fallback).forEach((name) => {
+        guarded[name] = (...args) => {
+            try {
+                return view[name](...args);
+            } catch (error) {
+                console.error(`Map call ${name} failed:`, error);
+                return fallback[name](...args);
+            }
+        };
+    });
+    return guarded;
+}
+
+// Picks the renderer the server asked for on the map element. A Google map
+// that fails to load is not swapped for Leaflet: drawing Google results on a
+// non-Google map is exactly what the Google provider has to avoid.
+export async function createMapView({ mapId, initialCenter, zoom }) {
+    const element = document.getElementById(mapId);
+    if (element.dataset.renderer !== 'google') {
+        return createMap({ mapId, initialCenter, zoom });
+    }
+
+    try {
+        const { createGoogleMap } = await import('./google-map.js');
+        return guardMapView(await createGoogleMap({
+            mapId,
+            initialCenter,
+            zoom,
+            apiKey: element.dataset.googleKey,
+            googleMapId: element.dataset.googleMapId,
+        }));
+    } catch (error) {
+        console.error('Google map failed to load:', error);
+        element.classList.add('map-unavailable');
+        element.textContent = 'The map could not be loaded. Routes and stops are still listed in the panel.';
+        return createEmptyMapView();
+    }
+}
+
 // Great-circle distance in meters between two [lat, lng] points.
 export function distanceMeters(a, b) {
     const toRad = (deg) => (deg * Math.PI) / 180;

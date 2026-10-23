@@ -1,9 +1,9 @@
 import { buildApiUrl, fetchJson } from './modules/api.js';
-import { createMap, getCurrentTurnInfo, renderCurrentTurn, renderTurnStatus, escapeHtml } from './modules/map.js';
+import { createMapView, getCurrentTurnInfo, renderCurrentTurn, renderTurnStatus, escapeHtml } from './modules/map.js';
 import { renderConvoyMembersUI } from './modules/convoy.js';
 import { showToast } from './modules/toast.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
 
     // --- THEME ---
     const THEME_KEY = 'waywise-theme';
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- MAP AND ELEMENT REFERENCES ---
-    const mapView = createMap({
+    const mapView = await createMapView({
         mapId: 'map',
         initialCenter: [28.6139, 77.2090],
         zoom: 7,
